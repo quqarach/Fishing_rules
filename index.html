@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Рыбалка: можно или нет?</title>
+
+  <!-- Стили Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    .header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      background-color: #2c3e50;
+      color: white;
+      padding: 10px 20px;
+      text-align: center;
+      font-size: 14px;
+      z-index: 1000;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    /* Левая панель */
+    .sidebar {
+      position: fixed;
+      top: 50px;
+      left: 20px;
+      width: 320px;
+      max-height: 80vh;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      z-index: 1000;
+      overflow-y: auto;
+      padding: 15px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .sidebar h3 {
+      margin-top: 0;
+      color: #2c3e50;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 5px;
+    }
+
+    .sidebar ul {
+      padding-left: 20px;
+      margin: 10px 0;
+    }
+
+    .sidebar li {
+      margin: 4px 0;
+    }
+
+    .sidebar table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+    }
+
+    .sidebar th, .sidebar td {
+      border: 1px solid #ddd;
+      padding: 6px;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    .sidebar th {
+      background-color: #f2f2f2;
+    }
+
+    .date-picker {
+      margin: 10px 0 15px 0;
+    }
+
+    .date-picker label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+      color: #2c3e50;
+    }
+
+    .date-picker input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    #map {
+      width: 100%;
+      height: 100vh;
+      margin-top: 50px;
+    }
+
+    .marker-info {
+      padding: 6px 8px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Шапка с актуальностью -->
+  <div class="header">
+    Данные на основе Приказа Минсельхоза РФ №1 от 9 января 2020 г. Актуально до <strong>1 марта 2026 года</strong>.
+  </div>
+
+  <!-- Левая панель с информацией -->
+  <div class="sidebar">
+    <h3>📅 Выберите дату</h3>
+    <div class="date-picker">
+      <label for="fishing-date">Дата рыбалки:</label>
+      <input type="date" id="fishing-date">
+    </div>
+
+    <h3>📅 Действующие запреты на выбранную дату</h3>
+    <ul id="active-restrictions">
+      <li>Выберите дату, чтобы увидеть запреты.</li>
+    </ul>
+
+    <h3>🚫 Общие запреты (постоянные)</h3>
+    <ul>
+      <li>Запрещено в каналах ГЭС, шлюзах, подводящих каналах.</li>
+      <li>Запрещено в 500 м от устьев рек и плотин.</li>
+      <li>Запрещено ловить осетровых, кутума, шемаю, рака с икрой.</li>
+      <li>Запрещено иметь при себе сети, неводы и другие запрещённые снасти.</li>
+    </ul>
+
+    <h3>🎣 Нормы вылова (любительское)</h3>
+    <table>
+      <tr><th>Вид рыбы</th><th>Мин. размер</th><th>Суточная норма</th></tr>
+      <tr><td>Судак</td><td>42 см</td><td>2 экз.</td></tr>
+      <tr><td>Сом</td><td>70 см</td><td>2 экз.</td></tr>
+      <tr><td>Сазан</td><td>35 см</td><td>3 экз.</td></tr>
+      <tr><td>Тарань</td><td>18 см</td><td>5 кг</td></tr>
+      <tr><td>Щука</td><td>40 см</td><td>2 экз.</td></tr>
+    </table>
+
+    <h3>🎣 Разрешённые орудия</h3>
+    <ul>
+      <li>Удочки всех видов — не более 5 крючков на человека.</li>
+      <li>Спиннинг.</li>
+      <li>Раколовки — только для ловли раков в пресной воде.</li>
+      <li>Запрещено: сети, неводы, трали, электропромысел, взрывы.</li>
+    </ul>
+  </div>
+
+  <!-- Контейнер карты -->
+  <div id="map"></div>
+
+  <!-- Подключаем Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
+
+  <script>
+    // Установка сегодняшней даты по умолчанию
+    const today = new Date();
+    const dateString = today.toISOString().slice(0, 10);
+    document.getElementById('fishing-date').value = dateString;
+
+    // Инициализация карты
+    const map = L.map('map').setView([47.2313, 39.7233], 8);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    let marker = null;
+
+    // --- База временных запретов из Приказа №1 ---
+    const seasonalRestrictions = [
+      {
+        name: "Цимлянское водохранилище: запрет от плотины до ст. Ложки",
+        period: { start: "05-01", end: "07-15" },
+        rule: "Запрещено рыболовство от плотины Цимлянской ГЭС до ж/д моста у ст. Ложки."
+      },
+      {
+        name: "Запретные для добычи (вылова) водных биоресурсов сроки (периоды):",
+        period: { start: "04-01", end: "05-31" },
+        rule: "в реке Аксай с впадающими в нее реками Тузлов, Грушевка и ериком Караич, рекой Черкасской с Махинским лиманом, реке Койсуг;"
+      },
+      {
+        name: "Рак пресноводный (Ростовская, Краснодарский край, Крым)",
+        period: { start: "01-01", end: "06-14" },
+        rule: "Запрещена ловля рака раколовками."
+      },
+      {
+        name: "Рак пресноводный (Ставропольский край, Карачаево-Черкесия)",
+        period: { start: "08-16", end: "11-30" },
+        rule: "Запрещена ловля рака раколовками."
+      },
+      {
+        name: "Зимовальные ямы (все)",
+        period: { start: "11-15", end: "03-31" },
+        rule: "Запрещено рыболовство в зимовальных ямах."
+      },
+      {
+        name: "Реки ДНР, Запорожской и Херсонской областей",
+        period: { start: "04-01", end: "05-31" },
+        rule: "Запрещено рыболовство во всех реках и пойменных водоёмах."
+      },
+      {
+        name: "Озеро Донузлав (Крым)",
+        period: { start: "06-01", end: "08-31" },
+        rule: "Запрещено рыболовство в 500 м от гирла озера."
+      },
+      {
+        name: "Река Дон: от ст. Ложки до устья Иловли",
+        period: { start: "04-25", end: "06-01" },
+        rule: "Запрещено рыболовство (кроме одной удочки с 1 крючком с берега)."
+      }
+    ];
+
+    // --- Функция: проверка, попадает ли дата в период ---
+    function isDateInPeriod(date, startMMDD, endMMDD) {
+      const monthDay = date.toISOString().slice(5, 10); // "MM-DD"
+      const year = date.getFullYear();
+
+      const start = new Date(`${year}-${startMMDD}`);
+      const end = new Date(`${year}-${endMMDD}`);
+      if (end < start) end.setFullYear(year + 1); // если период пересекает год
+
+      const target = new Date(date);
+      target.setHours(0, 0, 0, 0);
+
+      if (end > start) {
+        return target >= start && target <= end;
+      } else {
+        return target >= start || target <= end;
+      }
+    }
+
+    // --- Функция: обновление списка запретов ---
+    function updateRestrictions(date) {
+      const list = document.getElementById('active-restrictions');
+      list.innerHTML = '';
+
+      const active = seasonalRestrictions.filter(item => {
+        return isDateInPeriod(date, item.period.start, item.period.end);
+      });
+
+      if (active.length === 0) {
+        list.innerHTML = '<li>На выбранную дату нет временных запретов.</li>';
+      } else {
+        active.forEach(item => {
+          const li = document.createElement('li');
+          li.innerHTML = `<strong>${item.name}:</strong> ${item.rule}`;
+          list.appendChild(li);
+        });
+      }
+    }
+
+    // --- Обработчик изменения даты ---
+    document.getElementById('fishing-date').addEventListener('change', function() {
+      const selectedDateStr = this.value;
+      const selectedDate = new Date(selectedDateStr);
+      updateRestrictions(selectedDate);
+    });
+
+    // --- Обработчик клика по карте ---
+    map.on('click', function(e) {
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+      const selectedDateStr = document.getElementById('fishing-date').value;
+      const selectedDate = new Date(selectedDateStr);
+
+      if (marker) map.removeLayer(marker);
+      marker = L.marker([lat, lng]).addTo(map);
+
+      marker.bindPopup(`
+        <div class="marker-info">
+          <strong>Координаты:</strong><br>
+          Широта: ${lat.toFixed(6)}<br>
+          Долгота: ${lng.toFixed(6)}<br>
+          <strong>Дата:</strong> ${selectedDateStr}<br>
+          <em>Можно ли ловить — зависит от зоны и даты.</em>
+        </div>
+      `).openPopup();
+
+      console.log(`Метка: ${lat.toFixed(6)}, ${lng.toFixed(6)} | Дата: ${selectedDateStr}`);
+    });
+
+    // --- Инициализация: показать запреты на сегодня ---
+    updateRestrictions(today);
+  </script>
+</body>
+</html>
