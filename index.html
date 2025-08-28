@@ -20,7 +20,7 @@
 
     #map {
       width: 100%;
-      height: 100vh; /* Ключевое: карта занимает весь экран */
+      height: 100vh;
       background: #eee;
     }
 
@@ -90,6 +90,14 @@
       font-size: 13px;
       line-height: 1.5;
     }
+
+    .attribution-osm {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #666;
+      border-top: 1px solid #eee;
+      padding-top: 5px;
+    }
   </style>
 </head>
 <body>
@@ -99,16 +107,21 @@
     <label for="fishing-date">Выберите дату:</label>
     <input type="date" id="fishing-date" />
 
-    <h4 style="margin: 12px 0 6px 0; color: #2c3e50;">Общие запреты:</h4>
+    <h4 style="margin: 12px 0 6px 0; color: #2c3e50;">Действующие запреты:</h4>
     <div id="restrictions-list">
       <p style="color: #999; font-size: 13px;">Загрузка правил...</p>
+    </div>
+
+    <!-- Атрибуция OpenStreetMap (обязательно!) -->
+    <div class="attribution-osm">
+      Данные карты: © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>
     </div>
   </div>
 
   <!-- Карта -->
   <div id="map"></div>
 
-  <!-- Leaflet JS (без integrity для совместимости) -->
+  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
@@ -118,10 +131,14 @@
       document.getElementById('map').innerHTML = '<p style="color:red; text-align:center;">Ошибка: карта не загружена (Leaflet)</p>';
     }
 
-    // --- Инициализация карты ---
-    const map = L.map('map').setView([46.5, 40.5], 7);
+    // --- Инициализация карты (БЕЗ атрибуции Leaflet) ---
+    const map = L.map('map', {
+      attributionControl: false // 🔥 Убираем флаг и логотип Leaflet
+    }).setView([46.5, 40.5], 7);
+
+    // --- Подложка OSM ---
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
     // --- Глобальные переменные ---
@@ -164,7 +181,7 @@
         const p1 = L.latLng(lineCoords[i]);
         const p2 = L.latLng(lineCoords[i + 1]);
         const distance = L.LineUtil.pointToSegmentDistance(point, p1, p2);
-        if (distance < tolerance * 111) return true; // tolerance в градусах (~0.005° ≈ 500 м)
+        if (distance < tolerance * 111) return true;
       }
       return false;
     }
@@ -319,5 +336,4 @@
     loadRules();
   </script>
 </body>
-
 </html>
