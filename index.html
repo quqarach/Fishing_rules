@@ -52,6 +52,36 @@
       font-size: 14px;
     }
 
+    .restriction-item {
+      margin-bottom: 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .restriction-title {
+      background-color: #f8f8f8;
+      padding: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      color: #c62828;
+      font-size: 13px;
+      margin: 0;
+    }
+
+    .restriction-title:hover {
+      background-color: #eee;
+    }
+
+    .restriction-content {
+      padding: 10px;
+      background-color: #fff9f9;
+      border-top: 1px dashed #ccc;
+      display: none;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
     .attribution-osm {
       margin-top: 10px;
       font-size: 11px;
@@ -103,7 +133,6 @@
       background-color: #fff0f0;
       border-left: 3px solid #c62828;
       font-size: 12px;
-      color: #555;
     }
   </style>
 </head>
@@ -116,10 +145,15 @@
     (с изменениями и дополнениями от 28 июля 2025 г.)
   </div>
 
-  <!-- Панель выбора даты -->
+  <!-- Панель выбора даты и ОБЩИХ правил -->
   <div class="date-panel">
     <label for="fishing-date">Выберите дату:</label>
     <input type="date" id="fishing-date" />
+
+    <h4 style="margin: 12px 0 6px 0; color: #2c3e50;">Общие правила на дату:</h4>
+    <div id="restrictions-list">
+      <p style="color: #999; font-size: 13px;">Загрузка правил...</p>
+    </div>
 
     <div class="attribution-osm">
       Данные карты: © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>
@@ -133,7 +167,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    // Проверка Leaflet
+    // Проверка загрузки Leaflet
     if (typeof L === 'undefined') {
       document.getElementById('map').innerHTML = '<p style="color:red">Ошибка: Leaflet не загружен</p>';
     }
@@ -144,17 +178,18 @@
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // Глобальные переменные
-    let zoneLayers = [];
-    let marker = null;
+    // --- Глобальные переменные ---
+    let zoneLayers = [];     // Локальные зоны (полигоны, реки)
+    let generalRules = [];   // Общие правила (для панели)
+    let marker = null;       // Текущая метка
 
-    // Формат даты: YYYY-MM-DD → DD.MM.YYYY
+    // --- Формат даты: YYYY-MM-DD → DD.MM.YYYY ---
     function formatDate(dateStr) {
       const d = new Date(dateStr);
       return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
 
-    // Проверка диапазона дат
+    // --- Проверка диапазона дат ---
     function isDateInRange(target, startStr, endStr) {
       const start = new Date(startStr);
       const end = new Date(endStr);
@@ -165,11 +200,11 @@
       return t >= start && t <= end;
     }
 
-    // Проверка: точка в полигоне
+    // --- Утилита: точка в полигоне ---
     L.GeometryUtil = L.extend(L.GeometryUtil || {}, {
       pointInPolygon(latlng, polygonLatLngs) {
         let inside = false;
-        const latlngs = polygonLatLngs[0]; // внешний контур
+        const latlngs = polygonLatLngs[0];
         for (let i = 0, j = latlngs.length - 1; i < latlngs.length; j = i++) {
           const xi = latlngs[i].lat, yi = latlngs[i].lng;
           const xj = latlngs[j].lat, yj = latlngs[j].lng;
@@ -181,7 +216,7 @@
       }
     });
 
-    // Проверка: точка рядом с линией (в пределах N метров)
+    // --- Утилита: точка рядом с линией (в пределах 50 метров) ---
     function isPointNearLine(lat, lng, lineCoords, tolerance = 50) {
       const point = L.latLng(lat, lng);
       for (let i = 0; i < lineCoords.length - 1; i++) {
@@ -200,18 +235,19 @@
       return false;
     }
 
-    // Загрузка зон из JSON
+    // --- Загрузка правил из JSON ---
     async function loadZones() {
       try {
         const response = await fetch('rules-zones.json');
         if (!response.ok) throw new Error(`Не удалось загрузить rules-zones.json: ${response.status}`);
         const data = await response.json();
 
-        // Очистка старых слоёв
-        zoneLayers.forEach(layer => map.removeLayer(layer));
-        zoneLayers = [];
+        // Загружаем ОБЩИЕ правила (для панели)
+        generalRules = data.general_rules || [];
 
-        data.local_zones.forEach(zone => {
+        // Загружаем ЛОКАЛЬНЫЕ зоны (для карты, НЕ для панели)
+        zoneLayers = [];
+        (data.local_zones || []).forEach(zone => {
           let layer;
           if (zone.type === 'polygon') {
             layer = L.polygon(zone.coords, {
@@ -228,23 +264,24 @@
             });
           } else return;
 
-          // Сохраняем метаданные
           layer.zoneData = zone;
           layer.addTo(map);
           zoneLayers.push(layer);
         });
 
-        // Установка даты по умолчанию
+        // Устанавливаем дату по умолчанию
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('fishing-date').value = today;
         updateZoneColors(today);
+        updateGeneralRules(new Date(today));
       } catch (e) {
-        console.error("Ошибка загрузки зон:", e);
-        alert("Не удалось загрузить правила. Проверьте файл rules-zones.json");
+        console.error("Ошибка загрузки:", e);
+        document.getElementById('restrictions-list').innerHTML =
+          `<p style="color: red; font-size: 13px;">Ошибка: ${e.message}</p>`;
       }
     }
 
-    // Обновление цвета зон в зависимости от даты
+    // --- Обновление цвета локальных зон ---
     function updateZoneColors(dateStr) {
       const date = new Date(dateStr);
       zoneLayers.forEach(layer => {
@@ -256,7 +293,42 @@
       });
     }
 
-    // Обработчик клика по карте
+    // --- Обновление ОБЩИХ правил (только general_rules) ---
+    function updateGeneralRules(date) {
+      const container = document.getElementById('restrictions-list');
+      container.innerHTML = '';
+
+      const active = generalRules.filter(rule => isDateInRange(date, rule.start, rule.end));
+
+      if (active.length === 0) {
+        container.innerHTML = '<p style="color: #999; font-size: 13px;">Нет действующих общих правил</p>';
+      } else {
+        active.forEach(rule => {
+          const item = document.createElement('div');
+          item.className = 'restriction-item';
+
+          const title = document.createElement('div');
+          title.className = 'restriction-title';
+          title.textContent = rule.name;
+          title.style.cursor = 'pointer';
+
+          const content = document.createElement('div');
+          content.className = 'restriction-content';
+          content.innerHTML = rule.rule;
+          content.style.display = 'none';
+
+          title.onclick = () => {
+            content.style.display = content.style.display === 'block' ? 'none' : 'block';
+          };
+
+          item.appendChild(title);
+          item.appendChild(content);
+          container.appendChild(item);
+        });
+      }
+    }
+
+    // --- Обработчик клика по карте ---
     map.on('click', function(e) {
       const lat = e.latlng.lat;
       const lng = e.latlng.lng;
@@ -268,10 +340,9 @@
       marker = L.marker([lat, lng]).addTo(map);
 
       let locationName = null;
-      let isRestricted = false;
-      let restrictionRule = null;
+      let localRestrictions = []; // Только локальные запреты
 
-      // Проверяем все зоны
+      // Проверяем попадание в локальные зоны
       for (const layer of zoneLayers) {
         const zone = layer.zoneData;
         const isActivePeriod = isDateInRange(date, zone.start, zone.end);
@@ -280,25 +351,25 @@
         if (zone.type === 'polygon') {
           isInside = L.GeometryUtil.pointInPolygon(e.latlng, layer.getLatLngs());
         } else if (zone.type === 'line') {
-          isInside = isPointNearLine(lat, lng, zone.coords, 50); // 50 метров
+          isInside = isPointNearLine(lat, lng, zone.coords, 50);
         }
 
         if (isInside && isActivePeriod) {
           locationName = zone.name;
-          isRestricted = true;
-          restrictionRule = zone.rule; // ← Берём правило из JSON
-          break; // Достаточно первого совпадения
+          localRestrictions.push(zone.rule);
         }
       }
 
       // Формируем popup
       const locText = locationName ? `<strong>Локация:</strong> ${locationName}<br>` : '';
-      const status = isRestricted
+      const hasRestrictions = localRestrictions.length > 0;
+
+      const status = hasRestrictions
         ? '<span class="status error">❌ Рыбалка запрещена.</span>'
         : '<span class="status ok">✅ Рыбалка разрешена.</span>';
 
-      const reason = isRestricted
-        ? `<div class="reason"><strong>Причина:</strong><br>${restrictionRule}</div>`
+      const reasons = hasRestrictions
+        ? localRestrictions.map(r => `<div class="reason">${r}</div>`).join('')
         : '';
 
       marker.bindPopup(`
@@ -308,17 +379,19 @@
           <strong>Дата:</strong> ${formatDate(dateStr)}<br>
           <strong>Ограничения:</strong><br>
           ${status}
-          ${reason}
+          ${reasons}
         </div>
       `).openPopup();
     });
 
-    // При изменении даты
+    // --- При изменении даты ---
     document.getElementById('fishing-date').addEventListener('change', function() {
+      const date = new Date(this.value);
       updateZoneColors(this.value);
+      updateGeneralRules(date);
     });
 
-    // Загрузка при старте
+    // --- Загрузка при старте ---
     loadZones();
   </script>
 </body>
