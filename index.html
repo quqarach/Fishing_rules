@@ -175,16 +175,32 @@
     });
 
     // --- Утилита: точка рядом с линией ---
-    function isPointNearLine(lat, lng, lineCoords, tolerance = 0.005) {
-      const point = L.latLng(lat, lng);
-      for (let i = 0; i < lineCoords.length - 1; i++) {
-        const p1 = L.latLng(lineCoords[i]);
-        const p2 = L.latLng(lineCoords[i + 1]);
-        const distance = L.LineUtil.pointToSegmentDistance(point, p1, p2);
-        if (distance < tolerance * 111) return true;
-      }
-      return false;
+    ffunction isPointNearLine(lat, lng, lineCoords, toleranceMeters = 50) {
+  const point = L.latLng(lat, lng);
+  for (let i = 0; i < lineCoords.length - 1; i++) {
+    const p1 = L.latLng(lineCoords[i][0], lineCoords[i][1]);
+    const p2 = L.latLng(lineCoords[i + 1][0], lineCoords[i + 1][1]);
+    
+    if (typeof L.LineUtil.closestPointOnSegment === 'function') {
+      const closest = L.LineUtil.closestPointOnSegment(point, p1, p2);
+      const distance = point.distanceTo(closest);
+      if (distance <= toleranceMeters) return true;
+    } else {
+      // Резервный расчёт
+      const dx = p2.lat - p1.lat;
+      const dy = p2.lng - p1.lng;
+      const d = dx * dx + dy * dy;
+      if (d === 0) continue;
+      const t = ((point.lat - p1.lat) * dx + (point.lng - p1.lng) * dy) / d;
+      const projLat = p1.lat + t * dx;
+      const projLng = p1.lng + t * dy;
+      const projected = L.latLng(projLat, projLng);
+      const distance = point.distanceTo(projected);
+      if (distance <= toleranceMeters) return true;
     }
+  }
+  return false;
+}
 
     // --- Загрузка JSON ---
     async function loadRules() {
@@ -337,3 +353,4 @@
   </script>
 </body>
 </html>
+
