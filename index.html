@@ -112,7 +112,6 @@
       <p style="color: #999; font-size: 13px;">Загрузка правил...</p>
     </div>
 
-    <!-- Атрибуция OpenStreetMap (обязательно!) -->
     <div class="attribution-osm">
       Данные карты: © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>
     </div>
@@ -131,9 +130,9 @@
       document.getElementById('map').innerHTML = '<p style="color:red; text-align:center;">Ошибка: карта не загружена (Leaflet)</p>';
     }
 
-    // --- Инициализация карты (БЕЗ атрибуции Leaflet) ---
+    // --- Инициализация карты ---
     const map = L.map('map', {
-      attributionControl: false // 🔥 Убираем флаг и логотип Leaflet
+      attributionControl: false
     }).setView([46.5, 40.5], 7);
 
     // --- Подложка OSM ---
@@ -174,39 +173,42 @@
       }
     });
 
-    // --- Утилита: точка рядом с линией ---
+    // --- Утилита: точка рядом с линией (БЕЗ L.LineUtil) ---
     function isPointNearLine(lat, lng, lineCoords, toleranceMeters = 50) {
-  const point = L.latLng(lat, lng);
-  for (let i = 0; i < lineCoords.length - 1; i++) {
-    const p1 = L.latLng(lineCoords[i][0], lineCoords[i][1]);
-    const p2 = L.latLng(lineCoords[i + 1][0], lineCoords[i + 1][1]);
-    
-    if (typeof L.LineUtil.closestPointOnSegment === 'function') {
-      const closest = L.LineUtil.closestPointOnSegment(point, p1, p2);
-      const distance = point.distanceTo(closest);
-      if (distance <= toleranceMeters) return true;
-    } else {
-      // Резервный расчёт
-      const dx = p2.lat - p1.lat;
-      const dy = p2.lng - p1.lng;
-      const d = dx * dx + dy * dy;
-      if (d === 0) continue;
-      const t = ((point.lat - p1.lat) * dx + (point.lng - p1.lng) * dy) / d;
-      const projLat = p1.lat + t * dx;
-      const projLng = p1.lng + t * dy;
-      const projected = L.latLng(projLat, projLng);
-      const distance = point.distanceTo(projected);
-      if (distance <= toleranceMeters) return true;
+      const point = L.latLng(lat, lng);
+
+      if (!Array.isArray(lineCoords) || lineCoords.length === 0) return false;
+
+      for (let i = 0; i < lineCoords.length - 1; i++) {
+        const c1 = lineCoords[i], c2 = lineCoords[i + 1];
+        if (!c1 || !c2 || !Array.isArray(c1) || !Array.isArray(c2)) continue;
+
+        const p1 = L.latLng(c1[0], c1[1]);
+        const p2 = L.latLng(c2[0], c2[1]);
+
+        const dx = p2.lat - p1.lat;
+        const dy = p2.lng - p1.lng;
+        const d2 = dx * dx + dy * dy;
+        if (d2 === 0) continue;
+
+        const t = ((point.lat - p1.lat) * dx + (point.lng - p1.lng) * dy) / d2;
+        const tClamped = Math.max(0, Math.min(1, t));
+
+        const projLat = p1.lat + tClamped * dx;
+        const projLng = p1.lng + tClamped * dy;
+        const projected = L.latLng(projLat, projLng);
+
+        const distance = point.distanceTo(projected);
+        if (distance <= toleranceMeters) return true;
+      }
+      return false;
     }
-  }
-  return false;
-}
 
     // --- Загрузка JSON ---
     async function loadRules() {
       try {
         const response = await fetch('rules-zones.json');
-        if (!response.ok) throw new Error("Файл rules-zones.json не найден");
+        if (!response.ok) throw new Error(`Файл не найден: ${response.status}`);
         const data = await response.json();
 
         fullRestrictions = data.general_rules.map(r => ({
@@ -226,13 +228,13 @@
         updateZoneColors(today);
 
       } catch (e) {
-        console.error("Ошибка загрузки правил:", e);
+        console.error("Ошибка загрузки:", e);
         document.getElementById('restrictions-list').innerHTML =
           `<p style="color: red;">Ошибка: ${e.message}</p>`;
       }
     }
 
-    // --- Добавление зон на карту ---
+    // --- Добавление зон на карту + popup ---
     function addZonesToMap() {
       zoneLayers.forEach(item => {
         if (map.hasLayer(item.layer)) map.removeLayer(item.layer);
@@ -247,19 +249,33 @@
             fillColor: '#0f0',
             fillOpacity: 0.3,
             weight: 3
-          }).addTo(map);
+          });
         } else if (zone.type === "line") {
           layer = L.polyline(zone.coords, {
             color: 'green',
             weight: 8,
             opacity: 0.7
-          }).addTo(map);
+          });
+        } else {
+          return;
         }
+
+        // 🔥 Привязываем popup к слою — как в редакторе
+        layer.bindPopup(`
+          <div style="font-size:13px;line-height:1.5">
+            <strong>${zone.name}</strong><br>
+            ${zone.rule}<br>
+            <small><em>Период: ${zone.start} — ${zone.end}</em></small>
+          </div>
+        `);
+
+        layer.addTo(map);
+
         zoneLayers.push({ layer, zone });
       });
     }
 
-    // --- Обновление цвета зон ---
+    // --- Обновление цвета зон по дате ---
     function updateZoneColors(date) {
       zoneLayers.forEach(item => {
         const color = item.zone.period(date) ? 'red' : 'green';
@@ -296,7 +312,7 @@
       }
     }
 
-    // --- Обработчик клика ---
+    // --- Обработчик клика по карте ---
     map.on('click', function(e) {
       const lat = e.latlng.lat;
       const lng = e.latlng.lng;
@@ -312,11 +328,15 @@
       zoneLayers.forEach(item => {
         const { layer, zone } = item;
         let isInside = false;
+
         if (zone.type === "polygon") {
           isInside = L.GeometryUtil.contains(layer, e.latlng);
         } else if (zone.type === "line") {
-          isInside = isPointNearLine(lat, lng, zone.coords);
+          if (Array.isArray(zone.coords) && zone.coords.length > 0) {
+            isInside = isPointNearLine(lat, lng, zone.coords[0]);
+          }
         }
+
         if (isInside) {
           locationName = zone.name;
           if (zone.period(date)) {
@@ -353,4 +373,3 @@
   </script>
 </body>
 </html>
-
