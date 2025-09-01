@@ -86,11 +86,6 @@
       line-height: 1.4;
     }
 
-    .popup-info {
-      font-size: 13px;
-      line-height: 1.5;
-    }
-
     .attribution-osm {
       margin-top: 10px;
       font-size: 11px;
@@ -98,9 +93,65 @@
       border-top: 1px solid #eee;
       padding-top: 5px;
     }
+
+    /* Надпись сверху */
+    .legal-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #007cba;
+      color: white;
+      padding: 8px 16px;
+      text-align: center;
+      font-size: 12px;
+      z-index: 1000;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      line-height: 1.4;
+    }
+
+    /* Стили для popup */
+    .popup-info {
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .popup-info strong {
+      font-weight: bold;
+    }
+
+    .popup-info .status {
+      margin-top: 8px;
+      font-size: 14px;
+    }
+
+    .popup-info .status.ok {
+      color: #2e7d32;
+    }
+
+    .popup-info .status.warning {
+      color: #ff9800;
+    }
+
+    .popup-info .status.error {
+      color: #c62828;
+    }
+
+    .popup-info .period {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
   </style>
 </head>
 <body>
+
+  <!-- Плашка с приказом -->
+  <div class="legal-banner">
+    Согласно Приказу Министерства сельского хозяйства РФ от 9 января 2020 г. № 1<br>
+    "Об утверждении правил рыболовства для Азово-Черноморского рыбохозяйственного бассейна"<br>
+    (с изменениями и дополнениями от 28 июля 2025 г.)
+  </div>
 
   <!-- Панель с датой и запретами -->
   <div class="date-panel">
@@ -146,12 +197,17 @@
     let zoneLayers = [];
     let marker = null;
 
-    // --- Утилита: проверка диапазона дат (полный формат YYYY-MM-DD) ---
+    // --- Форматирование даты: YYYY-MM-DD → dd-mm-yyyy ---
+    function formatDate(dateStr) {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
+    // --- Утилита: проверка диапазона дат (YYYY-MM-DD) ---
     function isDateInRange(date, startStr, endStr) {
       const start = new Date(startStr);
       const end = new Date(endStr);
       const target = new Date(date);
-      // Обнуляем время для честного сравнения
       target.setHours(0, 0, 0, 0);
       start.setHours(0, 0, 0, 0);
       end.setHours(0, 0, 0, 0);
@@ -266,7 +322,7 @@
           <div style="font-size:13px;line-height:1.5">
             <strong>${zone.name}</strong><br>
             ${zone.rule}<br>
-            <small><em>Период: ${zone.start} — ${zone.end}</em></small>
+            <small class="period">Период: ${formatDate(zone.start)} — ${formatDate(zone.end)}</small>
           </div>
         `);
 
@@ -356,9 +412,11 @@
         <div class="popup-info">
           <strong>Координаты:</strong> ${lat.toFixed(6)}, ${lng.toFixed(6)}<br>
           ${loc}
-          <strong>Дата:</strong> ${dateStr}<br>
+          <strong>Дата:</strong> ${formatDate(dateStr)}<br>
           <strong>Ограничения:</strong><br>
-          ${status}
+          <div class="status ${restrictions.length > 0 ? 'error' : 'ok'}">
+            ${status}
+          </div>
         </div>
       `).openPopup();
     });
