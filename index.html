@@ -146,14 +146,15 @@
     let zoneLayers = [];
     let marker = null;
 
-    // --- Утилита: диапазон дат ---
-    function isDateInRange(date, startMMDD, endMMDD) {
-      const year = date.getFullYear();
-      const start = new Date(`${year}-${startMMDD}`);
-      let end = new Date(`${year}-${endMMDD}`);
-      if (end < start) end.setFullYear(year + 1);
+    // --- Утилита: проверка диапазона дат (полный формат YYYY-MM-DD) ---
+    function isDateInRange(date, startStr, endStr) {
+      const start = new Date(startStr);
+      const end = new Date(endStr);
       const target = new Date(date);
+      // Обнуляем время для честного сравнения
       target.setHours(0, 0, 0, 0);
+      start.setHours(0, 0, 0, 0);
+      end.setHours(0, 0, 0, 0);
       return target >= start && target <= end;
     }
 
@@ -173,7 +174,7 @@
       }
     });
 
-    // --- Утилита: точка рядом с линией (БЕЗ L.LineUtil) ---
+    // --- Утилита: точка рядом с линией ---
     function isPointNearLine(lat, lng, lineCoords, toleranceMeters = 50) {
       const point = L.latLng(lat, lng);
 
@@ -260,7 +261,7 @@
           return;
         }
 
-        // 🔥 Привязываем popup к слою — как в редакторе
+        // Привязываем popup
         layer.bindPopup(`
           <div style="font-size:13px;line-height:1.5">
             <strong>${zone.name}</strong><br>
@@ -278,8 +279,9 @@
     // --- Обновление цвета зон по дате ---
     function updateZoneColors(date) {
       zoneLayers.forEach(item => {
-        const color = item.zone.period(date) ? 'red' : 'green';
-        const fillColor = item.zone.period(date) ? '#f00' : '#0f0';
+        const isActive = item.zone.period(date);
+        const color = isActive ? 'red' : 'green';
+        const fillColor = isActive ? '#f00' : '#0f0';
         item.layer.setStyle({ color, fillColor });
       });
     }
