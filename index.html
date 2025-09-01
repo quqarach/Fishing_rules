@@ -175,7 +175,7 @@
     });
 
     // --- Утилита: точка рядом с линией ---
-    ffunction isPointNearLine(lat, lng, lineCoords, toleranceMeters = 50) {
+    function isPointNearLine(lat, lng, lineCoords, toleranceMeters = 50) {
   const point = L.latLng(lat, lng);
   for (let i = 0; i < lineCoords.length - 1; i++) {
     const p1 = L.latLng(lineCoords[i][0], lineCoords[i][1]);
