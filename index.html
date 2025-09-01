@@ -94,7 +94,7 @@
       padding-top: 5px;
     }
 
-    /* Надпись сверху */
+    /* Плашка сверху */
     .legal-banner {
       position: fixed;
       top: 0;
@@ -114,6 +114,12 @@
     .popup-info {
       font-size: 13px;
       line-height: 1.5;
+      margin: 0;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background: white;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
 
     .popup-info strong {
@@ -123,6 +129,8 @@
     .popup-info .status {
       margin-top: 8px;
       font-size: 14px;
+      display: flex;
+      align-items: center;
     }
 
     .popup-info .status.ok {
@@ -135,6 +143,33 @@
 
     .popup-info .status.error {
       color: #c62828;
+    }
+
+    .popup-info .status:before {
+      content: "";
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      margin-right: 8px;
+      border-radius: 50%;
+      background: #ccc;
+    }
+
+    .popup-info .status.ok:before {
+      background: #4caf50;
+      content: "✓";
+      color: white;
+      font-size: 10px;
+      font-weight: bold;
+      line-height: 12px;
+    }
+
+    .popup-info .status.error:before {
+      background: #f44336;
+      content: "⚠️";
+      color: white;
+      font-size: 10px;
+      line-height: 12px;
     }
 
     .popup-info .period {
@@ -197,13 +232,13 @@
     let zoneLayers = [];
     let marker = null;
 
-    // --- Форматирование даты: YYYY-MM-DD → dd-mm-yyyy ---
+    // --- Форматирование даты: YYYY-MM-DD → dd.mm.yyyy ---
     function formatDate(dateStr) {
       const d = new Date(dateStr);
-      return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\./g, '.');
     }
 
-    // --- Утилита: проверка диапазона дат (YYYY-MM-DD) ---
+    // --- Утилита: проверка диапазона дат ---
     function isDateInRange(date, startStr, endStr) {
       const start = new Date(startStr);
       const end = new Date(endStr);
@@ -319,7 +354,7 @@
 
         // Привязываем popup
         layer.bindPopup(`
-          <div style="font-size:13px;line-height:1.5">
+          <div class="popup-info">
             <strong>${zone.name}</strong><br>
             ${zone.rule}<br>
             <small class="period">Период: ${formatDate(zone.start)} — ${formatDate(zone.end)}</small>
