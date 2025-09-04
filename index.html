@@ -35,6 +35,13 @@
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
       z-index: 1000;
       font-size: 14px;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    .date-panel h4 {
+      margin: 12px 0 6px 0;
+      color: #2c3e50;
     }
 
     .date-panel label {
@@ -50,6 +57,16 @@
       border: 1px solid #ccc;
       border-radius: 4px;
       font-size: 14px;
+    }
+
+    #restrictions-list {
+      max-height: 60vh;
+      overflow-y: auto;
+      margin-top: 8px;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      padding: 4px 0;
+      background-color: #f9f9f9;
     }
 
     .restriction-item {
@@ -150,9 +167,9 @@
     <label for="fishing-date">Выберите дату:</label>
     <input type="date" id="fishing-date" />
 
-    <h4 style="margin: 12px 0 6px 0; color: #2c3e50;">Общие правила на дату:</h4>
+    <h4>Общие правила на дату:</h4>
     <div id="restrictions-list">
-      <p style="color: #999; font-size: 13px;">Загрузка правил...</p>
+      <p style="color: #999; font-size: 13px; text-align: center; margin: 8px 0;">Загрузка правил...</p>
     </div>
 
     <div class="attribution-osm">
@@ -270,7 +287,6 @@
               opacity: 0.8
             });
           } else if (zone.type === 'river' && Array.isArray(zone.branches)) {
-            // Создаём группу линий
             const group = L.layerGroup();
             zone.branches.forEach(branchCoords => {
               const branchLayer = L.polyline(branchCoords, {
@@ -340,7 +356,7 @@
       const active = generalRules.filter(rule => isDateInRange(date, rule.start, rule.end));
 
       if (active.length === 0) {
-        container.innerHTML = '<p style="color: #999; font-size: 13px;">Нет действующих общих правил</p>';
+        container.innerHTML = '<p style="color: #999; font-size: 13px; text-align: center; margin: 8px 0;">Нет действующих общих правил</p>';
       } else {
         active.forEach(rule => {
           const item = document.createElement('div');
@@ -407,9 +423,9 @@
         }
       }
 
-      // Проверяем общие правила
+      // Проверяем ТОЛЬКО общие правила, которые действительно запрещают рыбалку везде
       generalRules.forEach(rule => {
-        if (isDateInRange(date, rule.start, rule.end)) {
+        if (rule.appliesEverywhere && isDateInRange(date, rule.start, rule.end)) {
           activeRestrictions.push(rule.rule);
         }
       });
