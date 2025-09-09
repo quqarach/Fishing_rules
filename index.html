@@ -268,7 +268,7 @@
             });
           } else if (zone.type === 'line') {
             layer = L.polyline(zone.coords, {
-              color: 'blue',
+              color: 'green',
               weight: 6,
               opacity: 0.8
             });
@@ -276,7 +276,7 @@
             const group = L.layerGroup();
             zone.branches.forEach(branchCoords => {
               const branchLayer = L.polyline(branchCoords, {
-                color: 'blue',
+                color: 'green',
                 weight: 6,
                 opacity: 0.8
               });
@@ -311,7 +311,7 @@
           if (zone.type === 'polygon') {
             layer.setStyle({ color: 'green', fillColor: '#0f0', fillOpacity: 0.3, weight: 3 });
           } else if (zone.type === 'line' || zone.type === 'river') {
-            layer.eachLayer ? layer.eachLayer(sub => sub.setStyle({ color: 'blue', opacity: 0.8, weight: 6 })) :
+            layer.eachLayer ? layer.eachLayer(sub => sub.setStyle({ color: 'green', opacity: 0.8, weight: 6 })) :
               layer.setStyle({ color: 'green', opacity: 0.8, weight: 6 });
           }
           return;
@@ -423,7 +423,7 @@
         status = '⚠️ Рыбалка разрешена, но с ограничениями.';
         statusClass = 'warning';
       } else {
-        status = '✅ Рыбалка разрешена.';
+        status = '✅ Рыбалка разрешена при соблюдении общих правил';
         statusClass = 'ok';
       }
 
@@ -459,4 +459,3 @@
   </div>
 </body>
 </html>
-
