@@ -305,18 +305,51 @@
       const date = new Date(dateStr);
       zoneLayers.forEach(layer => {
         const zone = layer.zoneData;
-        const isActive = isDateInRange(date, zone.start, zone.end);
+        const isActivePeriod = isDateInRange(date, zone.start, zone.end);
 
-        if (!isActive) {
+        // 🚨 КЛЮЧЕВАЯ ЛОГИКА: СКРЫВАЕМ ЛОКАЛЬНЫЕ ЧАСТИЧНЫЕ ЗОНЫ, ЕСЛИ ЕСТЬ ГЛОБАЛЬНЫЙ ПОЛНЫЙ ЗАПРЕТ НА ЭТУ РЕКУ
+        if (isActivePeriod && zone.type !== undefined) {
+          // Проверяем: есть ли глобальное полное правило, которое применяется к этой реке?
+          const zoneNameLower = zone.name.toLowerCase();
+          const globalFullRuleForThisRiver = generalRules.some(globalRule =>
+            globalRule.appliesEverywhere &&
+            globalRule.ruleType === "full" &&
+            isDateInRange(date, globalRule.start, globalRule.end) &&
+            (
+              globalRule.name.toLowerCase().includes("р. койсуг") ||
+              globalRule.name.toLowerCase().includes("река койсуг") ||
+              zoneNameLower.includes("р. койсуг") ||
+              zoneNameLower.includes("река койсуг")
+            )
+          );
+
+          // Если есть глобальный полный запрет — скрываем эту локальную зону
+          if (globalFullRuleForThisRiver) {
+            // Скрываем слой (делаем его невидимым)
+            if (zone.type === 'polygon') {
+              layer.setStyle({ color: 'transparent', fillColor: 'transparent', fillOpacity: 0, weight: 0 });
+            } else if (zone.type === 'line' || zone.type === 'river') {
+              layer.eachLayer ? 
+                layer.eachLayer(sub => sub.setStyle({ color: 'transparent', opacity: 0, weight: 0 })) :
+                layer.setStyle({ color: 'transparent', opacity: 0, weight: 0 });
+            }
+            return; // Не применяем цвета — слой скрыт
+          }
+        }
+
+        // Если зона неактивна — зеленый цвет
+        if (!isActivePeriod) {
           if (zone.type === 'polygon') {
             layer.setStyle({ color: 'green', fillColor: '#0f0', fillOpacity: 0.3, weight: 3 });
           } else if (zone.type === 'line' || zone.type === 'river') {
-            layer.eachLayer ? layer.eachLayer(sub => sub.setStyle({ color: 'green', opacity: 0.8, weight: 6 })) :
+            layer.eachLayer ? 
+              layer.eachLayer(sub => sub.setStyle({ color: 'green', opacity: 0.8, weight: 6 })) :
               layer.setStyle({ color: 'green', opacity: 0.8, weight: 6 });
           }
           return;
         }
 
+        // Если зона активна — применяем цвет по типу правила
         const rule = generalRules.find(r => r.name === zone.name);
         const ruleType = zone.ruleType || rule?.type || 'full';
 
@@ -328,7 +361,9 @@
           }
         } else if (zone.type === 'line' || zone.type === 'river') {
           const style = ruleType === 'partial' ? { color: '#ff8f00', opacity: 0.9, weight: 8 } : { color: 'red', opacity: 0.9, weight: 8 };
-          layer.eachLayer ? layer.eachLayer(sublayer => sublayer.setStyle(style)) : layer.setStyle(style);
+          layer.eachLayer ? 
+            layer.eachLayer(sublayer => sublayer.setStyle(style)) :
+            layer.setStyle(style);
         }
       });
     }
@@ -405,6 +440,7 @@
         }
       }
 
+      // Проверяем глобальные правила — они имеют приоритет!
       generalRules.forEach(rule => {
         if (rule.appliesEverywhere && isDateInRange(date, rule.start, rule.end)) {
           if (rule.type === 'partial') {
