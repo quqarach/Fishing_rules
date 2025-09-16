@@ -286,7 +286,6 @@
           } else return;
 
           layer.zoneData = zone;
-          layer.addTo(map);
           zoneLayers.push(layer);
         });
 
@@ -303,13 +302,22 @@
 
     function updateZoneColors(dateStr) {
       const date = new Date(dateStr);
+
+      // Remove all layers from the map
+      zoneLayers.forEach(layer => map.removeLayer(layer));
+
+      // Group layers by their display order: green (bottom), yellow (middle), red (top)
+      const greenLayers = [];
+      const yellowLayers = [];
+      const redLayers = [];
+      const hiddenLayers = [];
+
       zoneLayers.forEach(layer => {
         const zone = layer.zoneData;
         const isActivePeriod = isDateInRange(date, zone.start, zone.end);
 
-        // 🚨 КЛЮЧЕВАЯ ЛОГИКА: СКРЫВАЕМ ЛОКАЛЬНЫЕ ЧАСТИЧНЫЕ ЗОНЫ, ЕСЛИ ЕСТЬ ГЛОБАЛЬНЫЙ ПОЛНЫЙ ЗАПРЕТ НА ЭТУ РЕКУ
+        // Check for global full restriction to hide local zones
         if (isActivePeriod && zone.type !== undefined) {
-          // Проверяем: есть ли глобальное полное правило, которое применяется к этой реке?
           const zoneNameLower = zone.name.toLowerCase();
           const globalFullRuleForThisRiver = generalRules.some(globalRule =>
             globalRule.appliesEverywhere &&
@@ -323,9 +331,8 @@
             )
           );
 
-          // Если есть глобальный полный запрет — скрываем эту локальную зону
           if (globalFullRuleForThisRiver) {
-            // Скрываем слой (делаем его невидимым)
+            // Hide the layer
             if (zone.type === 'polygon') {
               layer.setStyle({ color: 'transparent', fillColor: 'transparent', fillOpacity: 0, weight: 0 });
             } else if (zone.type === 'line' || zone.type === 'river') {
@@ -333,11 +340,12 @@
                 layer.eachLayer(sub => sub.setStyle({ color: 'transparent', opacity: 0, weight: 0 })) :
                 layer.setStyle({ color: 'transparent', opacity: 0, weight: 0 });
             }
-            return; // Не применяем цвета — слой скрыт
+            hiddenLayers.push(layer);
+            return;
           }
         }
 
-        // Если зона неактивна — зеленый цвет
+        // If zone is not active — green color
         if (!isActivePeriod) {
           if (zone.type === 'polygon') {
             layer.setStyle({ color: 'green', fillColor: '#0f0', fillOpacity: 0.3, weight: 3 });
@@ -346,25 +354,36 @@
               layer.eachLayer(sub => sub.setStyle({ color: 'green', opacity: 0.8, weight: 6 })) :
               layer.setStyle({ color: 'green', opacity: 0.8, weight: 6 });
           }
+          greenLayers.push(layer);
           return;
         }
 
-        // Если зона активна — применяем цвет по типу правила
+        // If zone is active — apply color based on rule type
         const rule = generalRules.find(r => r.name === zone.name);
         const ruleType = zone.ruleType || rule?.type || 'full';
 
         if (zone.type === 'polygon') {
           if (ruleType === 'partial') {
             layer.setStyle({ color: '#ff8f00', fillColor: '#ffb300', fillOpacity: 0.4, weight: 3 });
+            yellowLayers.push(layer);
           } else {
             layer.setStyle({ color: 'red', fillColor: '#f00', fillOpacity: 0.3, weight: 3 });
+            redLayers.push(layer);
           }
         } else if (zone.type === 'line' || zone.type === 'river') {
-          const style = ruleType === 'partial' ? { color: '#ff8f00', opacity: 0.9, weight: 8 } : { color: 'red', opacity: 0.9, weight: 8 };
+          const style = ruleType === 'partial' ? 
+            { color: '#ff8f00', opacity: 0.9, weight: 8 } : 
+            { color: 'red', opacity: 0.9, weight: 8 };
           layer.eachLayer ? 
             layer.eachLayer(sublayer => sublayer.setStyle(style)) :
             layer.setStyle(style);
+          ruleType === 'partial' ? yellowLayers.push(layer) : redLayers.push(layer);
         }
+      });
+
+      // Add layers back to the map in order: hidden (bottom), green, yellow, red (top)
+      [...hiddenLayers, ...greenLayers, ...yellowLayers, ...redLayers].forEach(layer => {
+        layer.addTo(map);
       });
     }
 
