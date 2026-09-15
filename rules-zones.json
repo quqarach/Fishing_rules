@@ -40,14 +40,6 @@
       "appliesEverywhere": false,
       "type": "full",
     },
-    {
-      "name": "Запрет на вылов вьюна2",
-      "rule": "46.1.3. Запрещена добыча (вылов) вьюна повсеместно в течение года.",
-      "start": "2026-01-01",
-      "end": "2100-12-31",
-      "appliesEverywhere": false,
-      "type": "full"
-    },
   ],
   "local_zones": [
     {
