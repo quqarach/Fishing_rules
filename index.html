@@ -169,7 +169,7 @@
     </div>
 
     <div class="attribution-osm">
-      Данные карты: © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>
+      Данные карты: © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> · © CARTO
     </div>
   </div>
 
@@ -183,8 +183,16 @@
     }
 
     const map = L.map('map', { attributionControl: false }).setView([46.5, 40.5], 7);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+
+    // ---------------------------------------------------------------------
+    // Тайлы: CARTO Positron (светлый минималистичный стиль, границы почти
+    // незаметны — тонкие светло-серые линии вместо ярких пунктиров).
+    // ---------------------------------------------------------------------
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      subdomains: 'abcd',
+      maxZoom: 19,
+      detectRetina: true
     }).addTo(map);
 
     let zoneLayers = [];
@@ -303,10 +311,8 @@
     function updateZoneColors(dateStr) {
       const date = new Date(dateStr);
 
-      // Remove all layers from the map
       zoneLayers.forEach(layer => map.removeLayer(layer));
 
-      // Group layers by their display order: green (bottom), yellow (middle), red (top)
       const greenLayers = [];
       const yellowLayers = [];
       const redLayers = [];
@@ -316,7 +322,6 @@
         const zone = layer.zoneData;
         const isActivePeriod = isDateInRange(date, zone.start, zone.end);
 
-        // Check for global full restriction to hide local zones
         if (isActivePeriod && zone.type !== undefined) {
           const zoneNameLower = zone.name.toLowerCase();
           const globalFullRuleForThisRiver = generalRules.some(globalRule =>
@@ -332,11 +337,10 @@
           );
 
           if (globalFullRuleForThisRiver) {
-            // Hide the layer
             if (zone.type === 'polygon') {
               layer.setStyle({ color: 'transparent', fillColor: 'transparent', fillOpacity: 0, weight: 0 });
             } else if (zone.type === 'line' || zone.type === 'river') {
-              layer.eachLayer ? 
+              layer.eachLayer ?
                 layer.eachLayer(sub => sub.setStyle({ color: 'transparent', opacity: 0, weight: 0 })) :
                 layer.setStyle({ color: 'transparent', opacity: 0, weight: 0 });
             }
@@ -345,12 +349,11 @@
           }
         }
 
-        // If zone is not active — green color
         if (!isActivePeriod) {
           if (zone.type === 'polygon') {
             layer.setStyle({ color: 'green', fillColor: '#0f0', fillOpacity: 0.3, weight: 3 });
           } else if (zone.type === 'line' || zone.type === 'river') {
-            layer.eachLayer ? 
+            layer.eachLayer ?
               layer.eachLayer(sub => sub.setStyle({ color: 'green', opacity: 0.8, weight: 6 })) :
               layer.setStyle({ color: 'green', opacity: 0.8, weight: 6 });
           }
@@ -358,7 +361,6 @@
           return;
         }
 
-        // If zone is active — apply color based on rule type
         const rule = generalRules.find(r => r.name === zone.name);
         const ruleType = zone.ruleType || rule?.type || 'full';
 
@@ -371,17 +373,16 @@
             redLayers.push(layer);
           }
         } else if (zone.type === 'line' || zone.type === 'river') {
-          const style = ruleType === 'partial' ? 
-            { color: '#ff8f00', opacity: 0.9, weight: 8 } : 
+          const style = ruleType === 'partial' ?
+            { color: '#ff8f00', opacity: 0.9, weight: 8 } :
             { color: 'red', opacity: 0.9, weight: 8 };
-          layer.eachLayer ? 
+          layer.eachLayer ?
             layer.eachLayer(sublayer => sublayer.setStyle(style)) :
             layer.setStyle(style);
           ruleType === 'partial' ? yellowLayers.push(layer) : redLayers.push(layer);
         }
       });
 
-      // Add layers back to the map in order: hidden (bottom), green, yellow, red (top)
       [...hiddenLayers, ...greenLayers, ...yellowLayers, ...redLayers].forEach(layer => {
         layer.addTo(map);
       });
@@ -459,7 +460,6 @@
         }
       }
 
-      // Проверяем глобальные правила — они имеют приоритет!
       generalRules.forEach(rule => {
         if (rule.appliesEverywhere && isDateInRange(date, rule.start, rule.end)) {
           if (rule.type === 'partial') {
