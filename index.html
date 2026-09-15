@@ -15,15 +15,19 @@
       --c-text-muted: #64748b;
       --c-border: #e2e8f0;
       --c-border-soft: #f1f5f9;
+
       --c-ok: #22c55e;
       --c-ok-bg: #dcfce7;
       --c-ok-text: #166534;
+
       --c-warning: #eab308;
       --c-warning-bg: #fef9c3;
       --c-warning-text: #854d0e;
+
       --c-error: #ef4444;
       --c-error-bg: #fee2e2;
       --c-error-text: #991b1b;
+
       --c-info: #38bdf8;
       --radius-md: 12px;
       --radius-lg: 16px;
@@ -229,41 +233,32 @@
     const map = new maplibregl.Map({
       container: 'map',
       style: 'https://tiles.openfreemap.org/styles/liberty',
-      center: [40.5, 46.5],   // Донбасс (в MapLibre порядок [lng, lat])
+      center: [40.5, 46.5],   // Донбасс — в MapLibre [lng, lat]
       zoom: 7,
       attributionControl: false
     });
 
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-left');
 
-    // Ловим ошибки загрузки
     map.on('error', (e) => {
       console.error('[MapLibre]', e?.error || e);
     });
 
     // =====================================================================
-    // 2. УДАЛЕНИЕ ГРАНИЦ ГОСУДАРСТВ
-    // =====================================================================
-    // В стиле Liberty границы — это слои boundary_3, boundary_2 и boundary_disputed.
-    // boundary_3 — административные границы уровня 3-6 (районы, области)
-    // boundary_2 — границы стран (admin_level = 2)
-    // boundary_disputed — спорные границы
-    // Удаляем их все после загрузки стиля.
+    // 2. УДАЛЕНИЕ ГРАНИЦ + РУССКИЕ ПОДПИСИ
     // =====================================================================
     map.on('load', () => {
+      // --- Удаляем все слои с границами ---
       const style = map.getStyle();
       if (style && style.layers) {
         style.layers
-          .filter(l => 
-            l.id.startsWith('boundary_') || 
-            l.id.includes('boundary')
-          )
+          .filter(l => l.id.startsWith('boundary_') || l.id.includes('boundary'))
           .forEach(l => {
             try { map.removeLayer(l.id); } catch (err) {}
           });
       }
 
-      // Русские подписи: заменяем name на name:ru с fallback
+      // --- Русские подписи: name:ru с fallback на name ---
       const newStyle = map.getStyle();
       if (newStyle && newStyle.layers) {
         newStyle.layers.forEach(layer => {
@@ -311,12 +306,11 @@
     // [lat, lng] -> [lng, lat]
     function swap(c) { return [c[1], c[0]]; }
 
-    // Приведение координат из формата Leaflet в GeoJSON
     function coordsPolygon(coords)  { return coords.map(ring => ring.map(swap)); }
     function coordsLine(coords)     { return coords.map(swap); }
     function coordsMultiLine(brs)   { return brs.map(b => b.map(swap)); }
 
-    // Точка внутри полигона (GeoJSON: [lng, lat])
+    // ---- Точка внутри полигона (GeoJSON: [lng, lat]) ----
     function pointInPolygon(lat, lng, polygonCoords) {
       let inside = false;
       const ring = polygonCoords[0];
@@ -330,25 +324,43 @@
       return inside;
     }
 
-    // Близость к линии (в градусах, ~55 м на 0.0005°)
-    function isPointNearLine(lat, lng, lineCoords, tol = 0.0005) {
+    // ---- Расстояние между двумя точками в МЕТРАХ (формула гаверсинуса) ----
+    function distanceMeters(lat1, lng1, lat2, lng2) {
+      const R = 6371000;
+      const φ1 = lat1 * Math.PI / 180;
+      const φ2 = lat2 * Math.PI / 180;
+      const Δφ = (lat2 - lat1) * Math.PI / 180;
+      const Δλ = (lng2 - lng1) * Math.PI / 180;
+      const a = Math.sin(Δφ/2) ** 2 +
+                Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    }
+
+    // ---- Точка рядом с линией. toleranceM — допуск в МЕТРАХ ----
+    function isPointNearLine(lat, lng, lineCoords, toleranceM = 100) {
       for (let i = 0; i < lineCoords.length - 1; i++) {
-        const [x1, y1] = lineCoords[i];
+        const [x1, y1] = lineCoords[i];     // [lng, lat]
         const [x2, y2] = lineCoords[i + 1];
+
         const dx = x2 - x1, dy = y2 - y1;
         const d2 = dx*dx + dy*dy;
-        if (d2 === 0) continue;
+        if (d2 === 0) {
+          if (distanceMeters(lat, lng, y1, x1) <= toleranceM) return true;
+          continue;
+        }
         let t = ((lng - x1) * dx + (lat - y1) * dy) / d2;
         t = Math.max(0, Math.min(1, t));
-        const px = x1 + t*dx, py = y1 + t*dy;
-        const dist = Math.hypot(lng - px, lat - py);
-        if (dist <= tol) return true;
+        const px = x1 + t * dx;
+        const py = y1 + t * dy;
+
+        if (distanceMeters(lat, lng, py, px) <= toleranceM) return true;
       }
       return false;
     }
 
-    function isNearAnyBranch(lat, lng, branches, tol = 0.0005) {
-      return branches.some(b => isPointNearLine(lat, lng, b, tol));
+    // ---- Для рек допуск шире — 300 м ----
+    function isNearAnyBranch(lat, lng, branches, toleranceM = 300) {
+      return branches.some(b => isPointNearLine(lat, lng, b, toleranceM));
     }
 
     // =====================================================================
@@ -384,7 +396,9 @@
               start: zone.start,
               end: zone.end,
               ruleType: zone.ruleType || 'full',
-              zoneType: zone.type
+              zoneType: zone.type,
+              // Допуск в метрах: для рек 300, для линий 150. Можно переопределить в JSON.
+              toleranceM: zone.toleranceM || (zone.type === 'river' ? 300 : 150)
             },
             geometry
           });
@@ -392,12 +406,10 @@
 
         zonesGeoJson = { type: 'FeatureCollection', features };
 
-        // Текущая дата
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('fishing-date').value = today;
         currentDate = new Date(today);
 
-        // Дожидаемся загрузки стиля и рисуем
         if (map.isStyleLoaded()) {
           buildZoneLayers();
           refreshZones();
@@ -431,8 +443,8 @@
           id: FILL, type: 'fill', source: SRC,
           filter: ['==', ['geometry-type'], 'Polygon'],
           paint: {
-            'fill-color': '#94a3b8',
-            'fill-opacity': 0.06
+            'fill-color': '#22c55e',
+            'fill-opacity': 0.12
           }
         });
       }
@@ -440,15 +452,15 @@
         map.addLayer({
           id: LINE, type: 'line', source: SRC,
           paint: {
-            'line-color': '#94a3b8',
-            'line-width': 1,
-            'line-opacity': 0.6
+            'line-color': '#22c55e',
+            'line-width': 3,
+            'line-opacity': 0.85
           }
         });
       }
     }
 
-    // Пересчёт состояний и применение стилей
+    // ---- Пересчёт состояний и применение стилей ----
     function refreshZones() {
       if (!map.getSource(SRC)) return;
 
@@ -487,41 +499,42 @@
 
       map.getSource(SRC).setData({ type: 'FeatureCollection', features });
 
-      // Expressions для paint
+      // ---- Expressions для paint ----
+      // Неактивные (none) — заметный зелёный, чтобы реки и полигоны читались
       const fillColor = ['match', ['get','state'],
-        'none',    '#94a3b8',
+        'none',    '#22c55e',
         'partial', '#eab308',
         'full',    '#ef4444',
         'hidden',  'transparent',
-        '#94a3b8'
+        '#22c55e'
       ];
       const fillOpacity = ['match', ['get','state'],
         'none',    0.12,
-        'partial', 0.18,
-        'full',    0.20,
+        'partial', 0.20,
+        'full',    0.22,
         'hidden',  0,
-        0.06
+        0.12
       ];
       const lineColor = ['match', ['get','state'],
         'none',    '#22c55e',
         'partial', '#eab308',
         'full',    '#ef4444',
         'hidden',  'transparent',
-        '#94a3b8'
+        '#22c55e'
       ];
       const lineWidth = ['match', ['get','state'],
         'none',    3,
         'partial', 4,
         'full',    4,
         'hidden',  0,
-        1
+        3
       ];
       const lineOpacity = ['match', ['get','state'],
         'none',    0.85,
         'partial', 0.95,
         'full',    0.95,
         'hidden',  0,
-        0.5
+        0.85
       ];
 
       map.setPaintProperty(FILL, 'fill-color', fillColor);
@@ -592,18 +605,20 @@
       const fullRestrictions = [];
       const partialRestrictions = [];
 
-      // Локальные зоны
+      // ---- Локальные зоны ----
       zonesGeoJson.features.forEach(f => {
         const p = f.properties;
         if (!isDateInRange(date, p.start, p.end)) return;
 
+        const tol = p.toleranceM || 150;
         let inside = false;
+
         if (f.geometry.type === 'Polygon') {
           inside = pointInPolygon(lat, lng, f.geometry.coordinates);
         } else if (f.geometry.type === 'LineString') {
-          inside = isPointNearLine(lat, lng, f.geometry.coordinates, 0.0005);
+          inside = isPointNearLine(lat, lng, f.geometry.coordinates, tol);
         } else if (f.geometry.type === 'MultiLineString') {
-          inside = isNearAnyBranch(lat, lng, f.geometry.coordinates, 0.0005);
+          inside = isNearAnyBranch(lat, lng, f.geometry.coordinates, tol);
         }
         if (!inside) return;
 
@@ -617,7 +632,7 @@
         }
       });
 
-      // Глобальные
+      // ---- Глобальные правила ----
       generalRules.forEach(rule => {
         if (rule.appliesEverywhere && isDateInRange(date, rule.start, rule.end)) {
           if (rule.type === 'partial') partialRestrictions.push(rule.rule);
