@@ -4,172 +4,339 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Рыбалка: можно или нет?</title>
-
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
   <style>
+    :root {
+      --c-bg: #f8fafc;
+      --c-surface: rgba(255, 255, 255, 0.92);
+      --c-surface-solid: #ffffff;
+      --c-text: #1e293b;
+      --c-text-muted: #64748b;
+      --c-border: #e2e8f0;
+      --c-border-soft: #f1f5f9;
+
+      --c-ok: #22c55e;
+      --c-ok-bg: #dcfce7;
+      --c-ok-text: #166534;
+
+      --c-warning: #eab308;
+      --c-warning-bg: #fef9c3;
+      --c-warning-text: #854d0e;
+
+      --c-error: #ef4444;
+      --c-error-bg: #fee2e2;
+      --c-error-text: #991b1b;
+
+      --c-info: #38bdf8;
+
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+
+      --shadow-panel: 0 8px 32px rgba(15, 23, 42, 0.12);
+      --shadow-marker: 0 2px 8px rgba(15, 23, 42, 0.25);
+      --shadow-popup: 0 12px 32px rgba(15, 23, 42, 0.18);
+    }
+
+    * { box-sizing: border-box; }
+
     body, html {
       margin: 0;
       padding: 0;
-      font-family: Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       width: 100%;
       height: 100%;
       overflow: hidden;
+      color: var(--c-text);
+      -webkit-font-smoothing: antialiased;
     }
 
     #map {
       width: 100%;
       height: 100vh;
-      background: #eee;
+      background: #eef2f6;
     }
 
+    /* ---------- Боковая панель ---------- */
     .date-panel {
       position: fixed;
-      top: 10px;
-      right: 10px;
-      width: 300px;
-      background: white;
-      padding: 12px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      top: 16px;
+      right: 16px;
+      width: 320px;
+      max-height: calc(100vh - 96px);
+      background: var(--c-surface);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      padding: 16px;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-panel);
+      border: 1px solid rgba(15, 23, 42, 0.06);
       z-index: 1000;
-      font-size: 14px;
-      max-height: 85vh;
+      font-size: 13px;
       overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 transparent;
+    }
+    .date-panel::-webkit-scrollbar { width: 6px; }
+    .date-panel::-webkit-scrollbar-thumb {
+      background: #cbd5e1; border-radius: 3px;
+    }
+    .date-panel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--c-ok), var(--c-info));
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     }
 
     .date-panel h4 {
-      margin: 12px 0 6px 0;
-      color: #2c3e50;
+      margin: 16px 0 8px 0;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--c-text-muted);
     }
 
     .date-panel label {
       display: block;
       margin-bottom: 6px;
-      font-weight: bold;
-      color: #2c3e50;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--c-text-muted);
     }
 
-    .date-panel input {
+    .date-panel input[type="date"] {
       width: 100%;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 14px;
+      padding: 10px 12px;
+      border: 1.5px solid var(--c-border);
+      border-radius: 10px;
+      font-size: 13px;
+      font-family: inherit;
+      background: #f8fafc;
+      color: var(--c-text);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .date-panel input[type="date"]:focus {
+      outline: none;
+      border-color: var(--c-ok);
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
     }
 
     #restrictions-list {
-      max-height: 60vh;
+      max-height: 55vh;
       overflow-y: auto;
-      margin-top: 8px;
-      border: 1px solid #eee;
-      border-radius: 4px;
-      padding: 4px 0;
-      background-color: #f9f9f9;
+      margin-top: 4px;
+      padding-right: 2px;
     }
 
     .restriction-item {
-      margin-bottom: 6px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
+      border-radius: 10px;
+      border: 1px solid var(--c-border);
       overflow: hidden;
+      margin-bottom: 8px;
+      background: #fff;
+      transition: box-shadow .15s;
+    }
+    .restriction-item:hover {
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
     }
 
     .restriction-title {
-      background-color: #f8f8f8;
-      padding: 8px;
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--c-text);
+      background: #f8fafc;
+      border-left: 3px solid var(--c-error);
       cursor: pointer;
-      font-weight: bold;
-      color: #c62828;
-      font-size: 13px;
-      margin: 0;
+      transition: background .15s;
+      line-height: 1.35;
     }
-
-    .restriction-title:hover {
-      background-color: #eee;
-    }
+    .restriction-title:hover { background: #f1f5f9; }
 
     .restriction-content {
-      padding: 10px;
-      background-color: #fff9f9;
-      border-top: 1px dashed #ccc;
+      padding: 10px 12px;
+      background: #fff;
+      border-top: 1px solid var(--c-border-soft);
       display: none;
       font-size: 12px;
-      line-height: 1.4;
+      line-height: 1.5;
+      color: #475569;
+      white-space: pre-line;
     }
 
     .attribution-osm {
-      margin-top: 10px;
+      margin-top: 12px;
       font-size: 11px;
-      color: #666;
-      border-top: 1px solid #eee;
-      padding-top: 5px;
+      color: var(--c-text-muted);
+      border-top: 1px solid var(--c-border-soft);
+      padding-top: 8px;
+      text-align: center;
+    }
+    .attribution-osm a {
+      color: var(--c-info);
+      text-decoration: none;
     }
 
+    /* ---------- Нижний баннер ---------- */
     .legal-banner {
       position: fixed;
       bottom: 0;
       left: 0;
       right: 0;
-      background: #007cba;
-      color: white;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: #e2e8f0;
       padding: 8px 16px;
       text-align: center;
-      font-size: 12px;
+      font-size: 11px;
       z-index: 1000;
-      box-shadow: 0 -2px 4px rgba(0,0,0,0.2);
-      line-height: 1.4;
+      line-height: 1.5;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .legal-banner strong { color: #fff; }
+
+    /* ---------- Кастомный маркер ---------- */
+    .custom-marker {
+      background: transparent;
+      border: none;
+    }
+    .custom-marker .marker-pin {
+      width: 32px;
+      height: 32px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      border: 3px solid #fff;
+      box-shadow: var(--shadow-marker);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: dropIn .25s ease-out;
+    }
+    .custom-marker .marker-pin span {
+      transform: rotate(45deg);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    @keyframes dropIn {
+      from { transform: rotate(-45deg) translateY(-8px); opacity: 0; }
+      to   { transform: rotate(-45deg) translateY(0);     opacity: 1; }
     }
 
-    .popup-info {
-      font-size: 13px;
-      line-height: 1.5;
+    /* ---------- Попап ---------- */
+    .leaflet-popup-content-wrapper {
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-popup);
+      padding: 0;
+      overflow: hidden;
+      border: 1px solid rgba(15, 23, 42, 0.06);
     }
+    .leaflet-popup-content {
+      margin: 0;
+      padding: 14px 16px;
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--c-text);
+      min-width: 220px;
+    }
+    .leaflet-popup-tip {
+      box-shadow: none;
+    }
+    .leaflet-popup-close-button {
+      color: #94a3b8 !important;
+      font-size: 20px !important;
+      padding: 6px 10px 0 0 !important;
+    }
+    .leaflet-popup-close-button:hover { color: #475569 !important; }
 
     .popup-info strong {
-      font-weight: bold;
+      font-weight: 600;
+      color: #0f172a;
     }
-
-    .popup-info .status {
-      margin-top: 8px;
-      font-weight: bold;
-    }
-
-    .popup-info .status.ok {
-      color: #2e7d32;
-    }
-
-    .popup-info .status.error {
-      color: #c62828;
-    }
-
-    .popup-info .status.warning {
-      color: #c68000;
-    }
-
-    .popup-info .reason {
-      margin-top: 6px;
-      padding: 6px;
-      background-color: #fff0f0;
-      border-left: 3px solid #c62828;
+    .popup-info .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 3px 0;
       font-size: 12px;
+      color: var(--c-text-muted);
+    }
+    .popup-info .row b {
+      color: #0f172a;
+      font-weight: 600;
+      text-align: right;
+    }
+    .popup-info .status {
+      display: inline-block;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      margin: 8px 0 4px 0;
+    }
+    .popup-info .status.ok {
+      background: var(--c-ok-bg);
+      color: var(--c-ok-text);
+    }
+    .popup-info .status.error {
+      background: var(--c-error-bg);
+      color: var(--c-error-text);
+    }
+    .popup-info .status.warning {
+      background: var(--c-warning-bg);
+      color: var(--c-warning-text);
+    }
+    .popup-info .reason {
+      margin-top: 8px;
+      padding: 8px 10px;
+      background: #f8fafc;
+      border-left: 3px solid var(--c-error);
+      border-radius: 0 6px 6px 0;
+      font-size: 11.5px;
+      color: #475569;
+      line-height: 1.5;
+      white-space: pre-line;
+    }
+    .popup-info .divider {
+      height: 1px;
+      background: var(--c-border-soft);
+      margin: 10px 0;
+    }
+
+    /* ---------- Мобильная адаптация ---------- */
+    @media (max-width: 720px) {
+      .date-panel {
+        top: 8px;
+        right: 8px;
+        left: 8px;
+        width: auto;
+        max-height: 55vh;
+        padding: 12px;
+      }
+      .legal-banner { font-size: 10px; padding: 6px 10px; }
     }
   </style>
 </head>
 <body>
 
   <div class="date-panel">
-    <label for="fishing-date">Выберите дату:</label>
+    <label for="fishing-date">Дата</label>
     <input type="date" id="fishing-date" />
 
-    <h4>Общие правила на дату:</h4>
+    <h4>Действующие правила</h4>
     <div id="restrictions-list">
-      <p style="color: #999; font-size: 13px; text-align: center; margin: 8px 0;">Загрузка правил...</p>
+      <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 8px 0;">Загрузка правил…</p>
     </div>
 
     <div class="attribution-osm">
-      Данные карты: © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>
+      © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> · © CARTO
     </div>
   </div>
 
@@ -179,12 +346,36 @@
 
   <script>
     if (typeof L === 'undefined') {
-      document.getElementById('map').innerHTML = '<p style="color:red">Ошибка: Leaflet не загружен</p>';
+      document.getElementById('map').innerHTML = '<p style="color:red;padding:20px;">Ошибка: Leaflet не загружен</p>';
     }
 
-    const map = L.map('map', { attributionControl: false }).setView([46.5, 40.5], 7);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    const map = L.map('map', { attributionControl: false, zoomControl: false })
+      .setView([46.5, 40.5], 7);
+
+    // Переместим zoom control в левый нижний угол (как у gdebenz — минималистично)
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+    // ---------------------------------------------------------------------
+    // ТАЙЛЫ
+    // ---------------------------------------------------------------------
+    // Вариант по умолчанию — CartoDB Voyager: чистый светлый стиль, похож на gdebenz.
+    // ВАЖНО ПРО РУССКИЕ ПОДПИСИ (Донецк, Луганск):
+    //   CartoDB/OSM берут тег `name`, который для этих городов в базе OSM = украинский.
+    //   Чтобы ВСЕ подписи были на русском — нужен рендер с параметром language=ru.
+    //   Зарегистрируйтесь бесплатно на https://www.maptiler.com/ и замените на:
+    //
+    //   L.tileLayer('https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=ВАШ_КЛЮЧ&language=ru', {
+    //     attribution: '© MapTiler © OpenStreetMap',
+    //     tileSize: 512,
+    //     zoomOffset: -1
+    //   }).addTo(map);
+    //
+    // ---------------------------------------------------------------------
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+      subdomains: 'abcd',
+      maxZoom: 19,
+      detectRetina: true
     }).addTo(map);
 
     let zoneLayers = [];
@@ -226,12 +417,10 @@
       for (let i = 0; i < lineCoords.length - 1; i++) {
         const p1 = L.latLng(lineCoords[i][0], lineCoords[i][1]);
         const p2 = L.latLng(lineCoords[i+1][0], lineCoords[i+1][1]);
-
         const dx = p2.lat - p1.lat;
         const dy = p2.lng - p1.lng;
         const d2 = dx*dx + dy*dy;
         if (d2 === 0) continue;
-
         const t = Math.max(0, Math.min(1, ((point.lat - p1.lat)*dx + (point.lng - p1.lng)*dy) / d2));
         const proj = L.latLng(p1.lat + t*dx, p1.lng + t*dy);
         if (point.distanceTo(proj) <= tolerance) return true;
@@ -240,9 +429,7 @@
     }
 
     function isNearAnyBranch(lat, lng, branches, tolerance = 50) {
-      return branches.some(branchCoords => {
-        return isPointNearLine(lat, lng, branchCoords, tolerance);
-      });
+      return branches.some(branchCoords => isPointNearLine(lat, lng, branchCoords, tolerance));
     }
 
     async function loadZones() {
@@ -261,26 +448,16 @@
 
           if (zone.type === 'polygon') {
             layer = L.polygon(zone.coords, {
-              color: 'green',
-              fillColor: '#0f0',
-              fillOpacity: 0.3,
-              weight: 3
+              color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.12, weight: 2
             });
           } else if (zone.type === 'line') {
             layer = L.polyline(zone.coords, {
-              color: 'green',
-              weight: 6,
-              opacity: 0.8
+              color: '#ef4444', weight: 4, opacity: 0.85
             });
           } else if (zone.type === 'river' && Array.isArray(zone.branches)) {
             const group = L.layerGroup();
             zone.branches.forEach(branchCoords => {
-              const branchLayer = L.polyline(branchCoords, {
-                color: 'green',
-                weight: 6,
-                opacity: 0.8
-              });
-              branchLayer.addTo(group);
+              L.polyline(branchCoords, { color: '#ef4444', weight: 4, opacity: 0.85 }).addTo(group);
             });
             layer = group;
           } else return;
@@ -296,27 +473,40 @@
       } catch (e) {
         console.error("Ошибка загрузки:", e);
         document.getElementById('restrictions-list').innerHTML =
-          `<p style="color: red; font-size: 13px;">Ошибка: ${e.message}</p>`;
+          `<p style="color: #ef4444; font-size: 12px;">Ошибка: ${e.message}</p>`;
+      }
+    }
+
+    // Единая таблица стилей для зон (приглушённые тона как у gdebenz)
+    const ZONE_STYLES = {
+      none:    { color: '#94a3b8', fillColor: '#94a3b8', fillOpacity: 0.06, weight: 1, opacity: 0.6 },
+      partial: { color: '#eab308', fillColor: '#eab308', fillOpacity: 0.12, weight: 2, opacity: 0.9 },
+      full:    { color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.14, weight: 2, opacity: 0.9 }
+    };
+
+    function applyStyle(layer, zone, styleObj) {
+      if (zone.type === 'polygon') {
+        layer.setStyle(styleObj);
+      } else if (zone.type === 'line' || zone.type === 'river') {
+        if (layer.eachLayer) {
+          layer.eachLayer(sub => sub.setStyle(styleObj));
+        } else {
+          layer.setStyle(styleObj);
+        }
       }
     }
 
     function updateZoneColors(dateStr) {
       const date = new Date(dateStr);
-
-      // Remove all layers from the map
       zoneLayers.forEach(layer => map.removeLayer(layer));
 
-      // Group layers by their display order: green (bottom), yellow (middle), red (top)
-      const greenLayers = [];
-      const yellowLayers = [];
-      const redLayers = [];
-      const hiddenLayers = [];
+      const byKind = { none: [], partial: [], full: [], hidden: [] };
 
       zoneLayers.forEach(layer => {
         const zone = layer.zoneData;
         const isActivePeriod = isDateInRange(date, zone.start, zone.end);
 
-        // Check for global full restriction to hide local zones
+        // Проверка глобального «полного запрета» — скрываем локальные зоны
         if (isActivePeriod && zone.type !== undefined) {
           const zoneNameLower = zone.name.toLowerCase();
           const globalFullRuleForThisRiver = generalRules.some(globalRule =>
@@ -332,59 +522,32 @@
           );
 
           if (globalFullRuleForThisRiver) {
-            // Hide the layer
-            if (zone.type === 'polygon') {
-              layer.setStyle({ color: 'transparent', fillColor: 'transparent', fillOpacity: 0, weight: 0 });
-            } else if (zone.type === 'line' || zone.type === 'river') {
-              layer.eachLayer ? 
-                layer.eachLayer(sub => sub.setStyle({ color: 'transparent', opacity: 0, weight: 0 })) :
-                layer.setStyle({ color: 'transparent', opacity: 0, weight: 0 });
-            }
-            hiddenLayers.push(layer);
+            const hidden = { color: 'transparent', fillColor: 'transparent', fillOpacity: 0, weight: 0, opacity: 0 };
+            applyStyle(layer, zone, hidden);
+            byKind.hidden.push(layer);
             return;
           }
         }
 
-        // If zone is not active — green color
         if (!isActivePeriod) {
-          if (zone.type === 'polygon') {
-            layer.setStyle({ color: 'green', fillColor: '#0f0', fillOpacity: 0.3, weight: 3 });
-          } else if (zone.type === 'line' || zone.type === 'river') {
-            layer.eachLayer ? 
-              layer.eachLayer(sub => sub.setStyle({ color: 'green', opacity: 0.8, weight: 6 })) :
-              layer.setStyle({ color: 'green', opacity: 0.8, weight: 6 });
-          }
-          greenLayers.push(layer);
+          applyStyle(layer, zone, ZONE_STYLES.none);
+          byKind.none.push(layer);
           return;
         }
 
-        // If zone is active — apply color based on rule type
         const rule = generalRules.find(r => r.name === zone.name);
         const ruleType = zone.ruleType || rule?.type || 'full';
 
-        if (zone.type === 'polygon') {
-          if (ruleType === 'partial') {
-            layer.setStyle({ color: '#ff8f00', fillColor: '#ffb300', fillOpacity: 0.4, weight: 3 });
-            yellowLayers.push(layer);
-          } else {
-            layer.setStyle({ color: 'red', fillColor: '#f00', fillOpacity: 0.3, weight: 3 });
-            redLayers.push(layer);
-          }
-        } else if (zone.type === 'line' || zone.type === 'river') {
-          const style = ruleType === 'partial' ? 
-            { color: '#ff8f00', opacity: 0.9, weight: 8 } : 
-            { color: 'red', opacity: 0.9, weight: 8 };
-          layer.eachLayer ? 
-            layer.eachLayer(sublayer => sublayer.setStyle(style)) :
-            layer.setStyle(style);
-          ruleType === 'partial' ? yellowLayers.push(layer) : redLayers.push(layer);
+        if (ruleType === 'partial') {
+          applyStyle(layer, zone, ZONE_STYLES.partial);
+          byKind.partial.push(layer);
+        } else {
+          applyStyle(layer, zone, ZONE_STYLES.full);
+          byKind.full.push(layer);
         }
       });
 
-      // Add layers back to the map in order: hidden (bottom), green, yellow, red (top)
-      [...hiddenLayers, ...greenLayers, ...yellowLayers, ...redLayers].forEach(layer => {
-        layer.addTo(map);
-      });
+      [...byKind.hidden, ...byKind.none, ...byKind.partial, ...byKind.full].forEach(layer => layer.addTo(map));
     }
 
     function updateGeneralRules(date) {
@@ -394,31 +557,59 @@
       const active = generalRules.filter(rule => isDateInRange(date, rule.start, rule.end));
 
       if (active.length === 0) {
-        container.innerHTML = '<p style="color: #999; font-size: 13px; text-align: center; margin: 8px 0;">Нет действующих общих правил</p>';
-      } else {
-        active.forEach(rule => {
-          const item = document.createElement('div');
-          item.className = 'restriction-item';
-
-          const title = document.createElement('div');
-          title.className = 'restriction-title';
-          title.textContent = rule.name;
-          title.style.cursor = 'pointer';
-
-          const content = document.createElement('div');
-          content.className = 'restriction-content';
-          content.innerHTML = rule.rule;
-          content.style.display = 'none';
-
-          title.onclick = () => {
-            content.style.display = content.style.display === 'block' ? 'none' : 'block';
-          };
-
-          item.appendChild(title);
-          item.appendChild(content);
-          container.appendChild(item);
-        });
+        container.innerHTML = '<p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 8px 0;">Нет действующих общих правил</p>';
+        return;
       }
+
+      active.forEach(rule => {
+        const item = document.createElement('div');
+        item.className = 'restriction-item';
+
+        const title = document.createElement('div');
+        title.className = 'restriction-title';
+        title.textContent = rule.name;
+
+        const content = document.createElement('div');
+        content.className = 'restriction-content';
+        content.textContent = rule.rule;
+        content.style.display = 'none';
+
+        title.onclick = () => {
+          content.style.display = content.style.display === 'block' ? 'none' : 'block';
+        };
+
+        item.appendChild(title);
+        item.appendChild(content);
+        container.appendChild(item);
+      });
+    }
+
+    // -------- Кастомный маркер в стиле gdebenz --------
+    function createStatusIcon(statusClass) {
+      const colors = {
+        ok: '#22c55e',
+        warning: '#eab308',
+        error: '#ef4444'
+      };
+      const icons = {
+        ok: '✓',
+        warning: '!',
+        error: '✕'
+      };
+      const color = colors[statusClass] || '#38bdf8';
+      const symbol = icons[statusClass] || '?';
+
+      return L.divIcon({
+        className: 'custom-marker',
+        html: `
+          <div class="marker-pin" style="background:${color};">
+            <span>${symbol}</span>
+          </div>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -30]
+      });
     }
 
     map.on('click', function(e) {
@@ -426,9 +617,6 @@
       const lng = e.latlng.lng;
       const dateStr = document.getElementById('fishing-date').value;
       const date = new Date(dateStr);
-
-      if (marker) map.removeLayer(marker);
-      marker = L.marker([lat, lng]).addTo(map);
 
       let locationName = null;
       let fullRestrictions = [];
@@ -459,7 +647,6 @@
         }
       }
 
-      // Проверяем глобальные правила — они имеют приоритет!
       generalRules.forEach(rule => {
         if (rule.appliesEverywhere && isDateInRange(date, rule.start, rule.end)) {
           if (rule.type === 'partial') {
@@ -472,13 +659,13 @@
 
       let status, statusClass;
       if (fullRestrictions.length > 0) {
-        status = '❌ Рыбалка запрещена.';
+        status = '❌ Рыбалка запрещена';
         statusClass = 'error';
       } else if (partialRestrictions.length > 0) {
-        status = '⚠️ Рыбалка разрешена, но с ограничениями.';
+        status = '⚠️ Разрешена с ограничениями';
         statusClass = 'warning';
       } else {
-        status = '✅ Рыбалка разрешена при соблюдении общих правил';
+        status = '✅ Рыбалка разрешена';
         statusClass = 'ok';
       }
 
@@ -486,13 +673,15 @@
         .map(r => `<div class="reason">${r}</div>`)
         .join('');
 
+      if (marker) map.removeLayer(marker);
+      marker = L.marker([lat, lng], { icon: createStatusIcon(statusClass) }).addTo(map);
+
       marker.bindPopup(`
         <div class="popup-info">
-          <strong>Координаты:</strong> ${lat.toFixed(6)}, ${lng.toFixed(6)}<br>
-          ${locationName ? `<strong>Локация:</strong> ${locationName}<br>` : ''}
-          <strong>Дата:</strong> ${formatDate(dateStr)}<br>
-          <strong>Ограничения:</strong><br>
-          <span class="status ${statusClass}">${status}</span>
+          ${locationName ? `<strong>${locationName}</strong><div class="divider"></div>` : ''}
+          <div class="row"><span>Дата</span><b>${formatDate(dateStr)}</b></div>
+          <div class="row"><span>Координаты</span><b>${lat.toFixed(5)}, ${lng.toFixed(5)}</b></div>
+          <div class="status ${statusClass}">${status}</div>
           ${reasons}
         </div>
       `).openPopup();
@@ -508,9 +697,7 @@
   </script>
 
   <div class="legal-banner">
-    Согласно Приказу Министерства сельского хозяйства РФ от 9 января 2020 г. № 1<br>
-    "Об утверждении правил рыболовства для Азово-Черноморского рыбохозяйственного бассейна"<br>
-    (с изменениями и дополнениями от 28 июля 2025 г.)
+    Приказ Министерства сельского хозяйства РФ от 9 января 2020 г. № 1 «Об утверждении правил рыболовства для Азово-Черноморского рыбохозяйственного бассейна» (с изм. и доп. от 28 июля 2025 г.)
   </div>
 </body>
 </html>
