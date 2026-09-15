@@ -2,203 +2,297 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Рыбалка: можно или нет?</title>
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- MapLibre GL JS CSS -->
+  <link href="https://unpkg.com/maplibre-gl@^5.0.0/dist/maplibre-gl.css" rel="stylesheet" />
 
   <style>
+    :root {
+      --c-surface: rgba(255, 255, 255, 0.92);
+      --c-text: #1e293b;
+      --c-text-muted: #64748b;
+      --c-border: #e2e8f0;
+      --c-border-soft: #f1f5f9;
+      --c-ok: #22c55e;
+      --c-ok-bg: #dcfce7;
+      --c-ok-text: #166534;
+      --c-warning: #eab308;
+      --c-warning-bg: #fef9c3;
+      --c-warning-text: #854d0e;
+      --c-error: #ef4444;
+      --c-error-bg: #fee2e2;
+      --c-error-text: #991b1b;
+      --c-info: #38bdf8;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --shadow-panel: 0 8px 32px rgba(15, 23, 42, 0.12);
+      --shadow-popup: 0 12px 32px rgba(15, 23, 42, 0.18);
+    }
+
+    * { box-sizing: border-box; }
+
     body, html {
-      margin: 0;
-      padding: 0;
-      font-family: Arial, sans-serif;
-      width: 100%;
-      height: 100%;
+      margin: 0; padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      width: 100%; height: 100%;
       overflow: hidden;
+      color: var(--c-text);
+      -webkit-font-smoothing: antialiased;
     }
 
-    #map {
-      width: 100%;
-      height: 100vh;
-      background: #eee;
-    }
+    #map { width: 100%; height: 100vh; background: #eef2f6; }
 
+    /* ---------- Боковая панель (стиль gdebenz) ---------- */
     .date-panel {
       position: fixed;
-      top: 10px;
-      right: 10px;
-      width: 300px;
-      background: white;
-      padding: 12px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      top: 16px; right: 16px;
+      width: 320px;
+      max-height: calc(100vh - 96px);
+      background: var(--c-surface);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      padding: 16px;
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-panel);
+      border: 1px solid rgba(15, 23, 42, 0.06);
       z-index: 1000;
-      font-size: 14px;
-      max-height: 85vh;
+      font-size: 13px;
       overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 transparent;
+    }
+    .date-panel::-webkit-scrollbar { width: 6px; }
+    .date-panel::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .date-panel::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--c-ok), var(--c-info));
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     }
 
     .date-panel h4 {
-      margin: 12px 0 6px 0;
-      color: #2c3e50;
+      margin: 16px 0 8px 0;
+      font-size: 12px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--c-text-muted);
     }
 
     .date-panel label {
-      display: block;
-      margin-bottom: 6px;
-      font-weight: bold;
-      color: #2c3e50;
+      display: block; margin-bottom: 6px;
+      font-size: 12px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.04em;
+      color: var(--c-text-muted);
     }
 
-    .date-panel input {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 14px;
+    .date-panel input[type="date"] {
+      width: 100%; padding: 10px 12px;
+      border: 1.5px solid var(--c-border); border-radius: 10px;
+      font-size: 13px; font-family: inherit;
+      background: #f8fafc; color: var(--c-text);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .date-panel input[type="date"]:focus {
+      outline: none; border-color: var(--c-ok);
+      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
     }
 
     #restrictions-list {
-      max-height: 60vh;
-      overflow-y: auto;
-      margin-top: 8px;
-      border: 1px solid #eee;
-      border-radius: 4px;
-      padding: 4px 0;
-      background-color: #f9f9f9;
+      max-height: 55vh; overflow-y: auto; margin-top: 4px; padding-right: 2px;
     }
 
     .restriction-item {
-      margin-bottom: 6px;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      overflow: hidden;
+      border-radius: 10px; border: 1px solid var(--c-border);
+      overflow: hidden; margin-bottom: 8px; background: #fff;
+      transition: box-shadow .15s;
     }
+    .restriction-item:hover { box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06); }
 
     .restriction-title {
-      background-color: #f8f8f8;
-      padding: 8px;
-      cursor: pointer;
-      font-weight: bold;
-      color: #c62828;
-      font-size: 13px;
-      margin: 0;
+      padding: 10px 12px; font-size: 12px; font-weight: 600;
+      color: var(--c-text); background: #f8fafc;
+      border-left: 3px solid var(--c-error);
+      cursor: pointer; transition: background .15s; line-height: 1.35;
     }
-
-    .restriction-title:hover {
-      background-color: #eee;
-    }
+    .restriction-title:hover { background: #f1f5f9; }
 
     .restriction-content {
-      padding: 10px;
-      background-color: #fff9f9;
-      border-top: 1px dashed #ccc;
-      display: none;
-      font-size: 12px;
-      line-height: 1.4;
+      padding: 10px 12px; background: #fff;
+      border-top: 1px solid var(--c-border-soft);
+      display: none; font-size: 12px; line-height: 1.5;
+      color: #475569; white-space: pre-line;
     }
 
     .attribution-osm {
-      margin-top: 10px;
-      font-size: 11px;
-      color: #666;
-      border-top: 1px solid #eee;
-      padding-top: 5px;
-    }
-
-    .legal-banner {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: #007cba;
-      color: white;
-      padding: 8px 16px;
+      margin-top: 12px; font-size: 11px; color: var(--c-text-muted);
+      border-top: 1px solid var(--c-border-soft); padding-top: 8px;
       text-align: center;
-      font-size: 12px;
-      z-index: 1000;
-      box-shadow: 0 -2px 4px rgba(0,0,0,0.2);
-      line-height: 1.4;
+    }
+    .attribution-osm a { color: var(--c-info); text-decoration: none; }
+
+    /* ---------- Нижний баннер ---------- */
+    .legal-banner {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: rgba(15, 23, 42, 0.88);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      color: #e2e8f0; padding: 8px 16px; text-align: center;
+      font-size: 11px; z-index: 1000; line-height: 1.5;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
     }
 
-    .popup-info {
-      font-size: 13px;
-      line-height: 1.5;
+    /* ---------- Попап MapLibre ---------- */
+    .maplibregl-popup-content {
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-popup);
+      padding: 14px 16px;
+      font-size: 13px; line-height: 1.55;
+      color: var(--c-text);
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      min-width: 220px;
     }
-
-    .popup-info strong {
-      font-weight: bold;
+    .maplibregl-popup-close-button {
+      color: #94a3b8; font-size: 20px; padding: 6px 10px 0 0;
     }
+    .maplibregl-popup-close-button:hover { color: #475569; }
 
+    .popup-info strong { font-weight: 600; color: #0f172a; }
+    .popup-info .row {
+      display: flex; justify-content: space-between; gap: 12px;
+      margin: 3px 0; font-size: 12px; color: var(--c-text-muted);
+    }
+    .popup-info .row b { color: #0f172a; font-weight: 600; text-align: right; }
     .popup-info .status {
-      margin-top: 8px;
-      font-weight: bold;
+      display: inline-block; padding: 5px 12px; border-radius: 20px;
+      font-size: 12px; font-weight: 700; margin: 8px 0 4px 0;
     }
-
-    .popup-info .status.ok {
-      color: #2e7d32;
-    }
-
-    .popup-info .status.error {
-      color: #c62828;
-    }
-
-    .popup-info .status.warning {
-      color: #c68000;
-    }
-
+    .popup-info .status.ok { background: var(--c-ok-bg); color: var(--c-ok-text); }
+    .popup-info .status.error { background: var(--c-error-bg); color: var(--c-error-text); }
+    .popup-info .status.warning { background: var(--c-warning-bg); color: var(--c-warning-text); }
     .popup-info .reason {
-      margin-top: 6px;
-      padding: 6px;
-      background-color: #fff0f0;
-      border-left: 3px solid #c62828;
-      font-size: 12px;
+      margin-top: 8px; padding: 8px 10px; background: #f8fafc;
+      border-left: 3px solid var(--c-error); border-radius: 0 6px 6px 0;
+      font-size: 11.5px; color: #475569; line-height: 1.5; white-space: pre-line;
+    }
+    .popup-info .divider { height: 1px; background: var(--c-border-soft); margin: 10px 0; }
+
+    /* ---------- Кастомный маркер ---------- */
+    .custom-marker {
+      width: 32px; height: 32px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      border: 3px solid #fff;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.25);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    .custom-marker span {
+      transform: rotate(45deg);
+      color: #fff; font-size: 14px; font-weight: 800; line-height: 1;
+    }
+
+    /* ---------- Мобильная адаптация ---------- */
+    @media (max-width: 720px) {
+      .date-panel {
+        top: 8px; right: 8px; left: 8px; width: auto;
+        max-height: 55vh; padding: 12px;
+      }
+      .legal-banner { font-size: 10px; padding: 6px 10px; }
     }
   </style>
 </head>
 <body>
 
   <div class="date-panel">
-    <label for="fishing-date">Выберите дату:</label>
+    <label for="fishing-date">Дата</label>
     <input type="date" id="fishing-date" />
 
-    <h4>Общие правила на дату:</h4>
+    <h4>Действующие правила</h4>
     <div id="restrictions-list">
-      <p style="color: #999; font-size: 13px; text-align: center; margin: 8px 0;">Загрузка правил...</p>
+      <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 8px 0;">Загрузка правил…</p>
     </div>
 
     <div class="attribution-osm">
-      Данные карты: © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> · © CARTO
+      © <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> · OpenFreeMap
     </div>
   </div>
 
   <div id="map"></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/maplibre-gl@^5.0.0/dist/maplibre-gl.js"></script>
 
   <script>
-    if (typeof L === 'undefined') {
-      document.getElementById('map').innerHTML = '<p style="color:red">Ошибка: Leaflet не загружен</p>';
-    }
+    // =====================================================================
+    // 1. КАРТА (MapLibre + OpenFreeMap Liberty)
+    // =====================================================================
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: 'https://tiles.openfreemap.org/styles/liberty',
+      center: [40.5, 46.5],   // Донбасс (в MapLibre порядок [lng, lat])
+      zoom: 7,
+      attributionControl: false
+    });
 
-    const map = L.map('map', { attributionControl: false }).setView([46.5, 40.5], 7);
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-left');
 
-    // ---------------------------------------------------------------------
-    // Тайлы: CARTO Positron (светлый минималистичный стиль, границы почти
-    // незаметны — тонкие светло-серые линии вместо ярких пунктиров).
-    // ---------------------------------------------------------------------
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-      subdomains: 'abcd',
-      maxZoom: 19,
-      detectRetina: true
-    }).addTo(map);
+    // Ловим ошибки загрузки
+    map.on('error', (e) => {
+      console.error('[MapLibre]', e?.error || e);
+    });
 
-    let zoneLayers = [];
+    // =====================================================================
+    // 2. УДАЛЕНИЕ ГРАНИЦ ГОСУДАРСТВ
+    // =====================================================================
+    // В стиле Liberty границы — это слои boundary_3, boundary_2 и boundary_disputed.
+    // boundary_3 — административные границы уровня 3-6 (районы, области)
+    // boundary_2 — границы стран (admin_level = 2)
+    // boundary_disputed — спорные границы
+    // Удаляем их все после загрузки стиля.
+    // =====================================================================
+    map.on('load', () => {
+      const style = map.getStyle();
+      if (style && style.layers) {
+        style.layers
+          .filter(l => 
+            l.id.startsWith('boundary_') || 
+            l.id.includes('boundary')
+          )
+          .forEach(l => {
+            try { map.removeLayer(l.id); } catch (err) {}
+          });
+      }
+
+      // Русские подписи: заменяем name на name:ru с fallback
+      const newStyle = map.getStyle();
+      if (newStyle && newStyle.layers) {
+        newStyle.layers.forEach(layer => {
+          if (!layer.layout || !layer.layout['text-field']) return;
+          const tfStr = JSON.stringify(layer.layout['text-field']);
+          if (!tfStr.includes('"name"') && !tfStr.includes("'name'")) return;
+          if (tfStr.includes('name:ru')) return;
+          try {
+            map.setLayoutProperty(layer.id, 'text-field', [
+              'coalesce',
+              ['get', 'name:ru'],
+              ['get', 'name']
+            ]);
+          } catch (err) {}
+        });
+      }
+    });
+
+    // =====================================================================
+    // 3. СОСТОЯНИЕ
+    // =====================================================================
     let generalRules = [];
+    let zonesGeoJson = { type: 'FeatureCollection', features: [] };
+    let currentDate = new Date();
     let marker = null;
 
+    // =====================================================================
+    // 4. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+    // =====================================================================
     function formatDate(dateStr) {
       const d = new Date(dateStr);
       return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -214,303 +308,375 @@
       return t >= start && t <= end;
     }
 
-    L.GeometryUtil = L.extend(L.GeometryUtil || {}, {
-      pointInPolygon(latlng, polygonLatLngs) {
-        let inside = false;
-        const latlngs = polygonLatLngs[0];
-        for (let i = 0, j = latlngs.length - 1; i < latlngs.length; j = i++) {
-          const xi = latlngs[i].lat, yi = latlngs[i].lng;
-          const xj = latlngs[j].lat, yj = latlngs[j].lng;
-          const intersect = ((yi > latlng.lng) !== (yj > latlng.lng)) &&
-            (latlng.lat < (xj - xi) * (latlng.lng - yi) / (yj - yi) + xi);
-          if (intersect) inside = !inside;
-        }
-        return inside;
+    // [lat, lng] -> [lng, lat]
+    function swap(c) { return [c[1], c[0]]; }
+
+    // Приведение координат из формата Leaflet в GeoJSON
+    function coordsPolygon(coords)  { return coords.map(ring => ring.map(swap)); }
+    function coordsLine(coords)     { return coords.map(swap); }
+    function coordsMultiLine(brs)   { return brs.map(b => b.map(swap)); }
+
+    // Точка внутри полигона (GeoJSON: [lng, lat])
+    function pointInPolygon(lat, lng, polygonCoords) {
+      let inside = false;
+      const ring = polygonCoords[0];
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const xi = ring[i][0], yi = ring[i][1];
+        const xj = ring[j][0], yj = ring[j][1];
+        const intersect = ((yi > lat) !== (yj > lat)) &&
+          (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
       }
-    });
+      return inside;
+    }
 
-    function isPointNearLine(lat, lng, lineCoords, tolerance = 50) {
-      const point = L.latLng(lat, lng);
+    // Близость к линии (в градусах, ~55 м на 0.0005°)
+    function isPointNearLine(lat, lng, lineCoords, tol = 0.0005) {
       for (let i = 0; i < lineCoords.length - 1; i++) {
-        const p1 = L.latLng(lineCoords[i][0], lineCoords[i][1]);
-        const p2 = L.latLng(lineCoords[i+1][0], lineCoords[i+1][1]);
-
-        const dx = p2.lat - p1.lat;
-        const dy = p2.lng - p1.lng;
+        const [x1, y1] = lineCoords[i];
+        const [x2, y2] = lineCoords[i + 1];
+        const dx = x2 - x1, dy = y2 - y1;
         const d2 = dx*dx + dy*dy;
         if (d2 === 0) continue;
-
-        const t = Math.max(0, Math.min(1, ((point.lat - p1.lat)*dx + (point.lng - p1.lng)*dy) / d2));
-        const proj = L.latLng(p1.lat + t*dx, p1.lng + t*dy);
-        if (point.distanceTo(proj) <= tolerance) return true;
+        let t = ((lng - x1) * dx + (lat - y1) * dy) / d2;
+        t = Math.max(0, Math.min(1, t));
+        const px = x1 + t*dx, py = y1 + t*dy;
+        const dist = Math.hypot(lng - px, lat - py);
+        if (dist <= tol) return true;
       }
       return false;
     }
 
-    function isNearAnyBranch(lat, lng, branches, tolerance = 50) {
-      return branches.some(branchCoords => {
-        return isPointNearLine(lat, lng, branchCoords, tolerance);
-      });
+    function isNearAnyBranch(lat, lng, branches, tol = 0.0005) {
+      return branches.some(b => isPointNearLine(lat, lng, b, tol));
     }
 
+    // =====================================================================
+    // 5. ЗАГРУЗКА ДАННЫХ
+    // =====================================================================
     async function loadZones() {
       try {
-        const response = await fetch('rules-zones.json');
-        if (!response.ok) throw new Error(`Не удалось загрузить rules-zones.json: ${response.status}`);
-        const data = await response.json();
+        const res = await fetch('rules-zones.json');
+        if (!res.ok) throw new Error(`Не удалось загрузить rules-zones.json: ${res.status}`);
+        const data = await res.json();
 
         generalRules = data.general_rules || [];
 
-        zoneLayers.forEach(layer => map.removeLayer(layer));
-        zoneLayers = [];
-
-        (data.local_zones || []).forEach(zone => {
-          let layer;
-
+        const features = [];
+        (data.local_zones || []).forEach((zone, idx) => {
+          let geometry;
           if (zone.type === 'polygon') {
-            layer = L.polygon(zone.coords, {
-              color: 'green',
-              fillColor: '#0f0',
-              fillOpacity: 0.3,
-              weight: 3
-            });
+            geometry = { type: 'Polygon', coordinates: coordsPolygon(zone.coords) };
           } else if (zone.type === 'line') {
-            layer = L.polyline(zone.coords, {
-              color: 'green',
-              weight: 6,
-              opacity: 0.8
-            });
+            geometry = { type: 'LineString', coordinates: coordsLine(zone.coords) };
           } else if (zone.type === 'river' && Array.isArray(zone.branches)) {
-            const group = L.layerGroup();
-            zone.branches.forEach(branchCoords => {
-              const branchLayer = L.polyline(branchCoords, {
-                color: 'green',
-                weight: 6,
-                opacity: 0.8
-              });
-              branchLayer.addTo(group);
-            });
-            layer = group;
-          } else return;
+            geometry = { type: 'MultiLineString', coordinates: coordsMultiLine(zone.branches) };
+          } else {
+            return;
+          }
 
-          layer.zoneData = zone;
-          zoneLayers.push(layer);
+          features.push({
+            type: 'Feature',
+            id: idx,
+            properties: {
+              name: zone.name,
+              rule: zone.rule,
+              start: zone.start,
+              end: zone.end,
+              ruleType: zone.ruleType || 'full',
+              zoneType: zone.type
+            },
+            geometry
+          });
         });
 
+        zonesGeoJson = { type: 'FeatureCollection', features };
+
+        // Текущая дата
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('fishing-date').value = today;
-        updateZoneColors(today);
-        updateGeneralRules(new Date(today));
+        currentDate = new Date(today);
+
+        // Дожидаемся загрузки стиля и рисуем
+        if (map.isStyleLoaded()) {
+          buildZoneLayers();
+          refreshZones();
+        } else {
+          map.once('load', () => {
+            buildZoneLayers();
+            refreshZones();
+          });
+        }
+        updateGeneralRules(currentDate);
       } catch (e) {
-        console.error("Ошибка загрузки:", e);
+        console.error('Ошибка загрузки:', e);
         document.getElementById('restrictions-list').innerHTML =
-          `<p style="color: red; font-size: 13px;">Ошибка: ${e.message}</p>`;
+          `<p style="color:#ef4444;font-size:12px;">Ошибка: ${e.message}</p>`;
       }
     }
 
-    function updateZoneColors(dateStr) {
-      const date = new Date(dateStr);
+    // =====================================================================
+    // 6. СЛОИ ЗОН
+    // =====================================================================
+    const SRC = 'zones';
+    const FILL = 'zones-fill';
+    const LINE = 'zones-line';
 
-      zoneLayers.forEach(layer => map.removeLayer(layer));
+    function buildZoneLayers() {
+      if (!map.getSource(SRC)) {
+        map.addSource(SRC, { type: 'geojson', data: zonesGeoJson });
+      }
+      if (!map.getLayer(FILL)) {
+        map.addLayer({
+          id: FILL, type: 'fill', source: SRC,
+          filter: ['==', ['geometry-type'], 'Polygon'],
+          paint: {
+            'fill-color': '#94a3b8',
+            'fill-opacity': 0.06
+          }
+        });
+      }
+      if (!map.getLayer(LINE)) {
+        map.addLayer({
+          id: LINE, type: 'line', source: SRC,
+          paint: {
+            'line-color': '#94a3b8',
+            'line-width': 1,
+            'line-opacity': 0.6
+          }
+        });
+      }
+    }
 
-      const greenLayers = [];
-      const yellowLayers = [];
-      const redLayers = [];
-      const hiddenLayers = [];
+    // Пересчёт состояний и применение стилей
+    function refreshZones() {
+      if (!map.getSource(SRC)) return;
 
-      zoneLayers.forEach(layer => {
-        const zone = layer.zoneData;
-        const isActivePeriod = isDateInRange(date, zone.start, zone.end);
+      const date = currentDate;
 
-        if (isActivePeriod && zone.type !== undefined) {
-          const zoneNameLower = zone.name.toLowerCase();
-          const globalFullRuleForThisRiver = generalRules.some(globalRule =>
-            globalRule.appliesEverywhere &&
-            globalRule.ruleType === "full" &&
-            isDateInRange(date, globalRule.start, globalRule.end) &&
+      const features = zonesGeoJson.features.map(f => {
+        const p = f.properties;
+        const active = isDateInRange(date, p.start, p.end);
+        let state = 'none';
+
+        if (active) {
+          const nameLower = (p.name || '').toLowerCase();
+          const globalKoysugFull = generalRules.some(gr =>
+            gr.appliesEverywhere &&
+            gr.ruleType === 'full' &&
+            isDateInRange(date, gr.start, gr.end) &&
             (
-              globalRule.name.toLowerCase().includes("р. койсуг") ||
-              globalRule.name.toLowerCase().includes("река койсуг") ||
-              zoneNameLower.includes("р. койсуг") ||
-              zoneNameLower.includes("река койсуг")
+              gr.name.toLowerCase().includes('р. койсуг') ||
+              gr.name.toLowerCase().includes('река койсуг') ||
+              nameLower.includes('р. койсуг') ||
+              nameLower.includes('река койсуг')
             )
           );
 
-          if (globalFullRuleForThisRiver) {
-            if (zone.type === 'polygon') {
-              layer.setStyle({ color: 'transparent', fillColor: 'transparent', fillOpacity: 0, weight: 0 });
-            } else if (zone.type === 'line' || zone.type === 'river') {
-              layer.eachLayer ?
-                layer.eachLayer(sub => sub.setStyle({ color: 'transparent', opacity: 0, weight: 0 })) :
-                layer.setStyle({ color: 'transparent', opacity: 0, weight: 0 });
-            }
-            hiddenLayers.push(layer);
-            return;
-          }
-        }
-
-        if (!isActivePeriod) {
-          if (zone.type === 'polygon') {
-            layer.setStyle({ color: 'green', fillColor: '#0f0', fillOpacity: 0.3, weight: 3 });
-          } else if (zone.type === 'line' || zone.type === 'river') {
-            layer.eachLayer ?
-              layer.eachLayer(sub => sub.setStyle({ color: 'green', opacity: 0.8, weight: 6 })) :
-              layer.setStyle({ color: 'green', opacity: 0.8, weight: 6 });
-          }
-          greenLayers.push(layer);
-          return;
-        }
-
-        const rule = generalRules.find(r => r.name === zone.name);
-        const ruleType = zone.ruleType || rule?.type || 'full';
-
-        if (zone.type === 'polygon') {
-          if (ruleType === 'partial') {
-            layer.setStyle({ color: '#ff8f00', fillColor: '#ffb300', fillOpacity: 0.4, weight: 3 });
-            yellowLayers.push(layer);
+          if (globalKoysugFull) {
+            state = 'hidden';
           } else {
-            layer.setStyle({ color: 'red', fillColor: '#f00', fillOpacity: 0.3, weight: 3 });
-            redLayers.push(layer);
+            const rule = generalRules.find(r => r.name === p.name);
+            const rt = p.ruleType || rule?.type || 'full';
+            state = rt === 'partial' ? 'partial' : 'full';
           }
-        } else if (zone.type === 'line' || zone.type === 'river') {
-          const style = ruleType === 'partial' ?
-            { color: '#ff8f00', opacity: 0.9, weight: 8 } :
-            { color: 'red', opacity: 0.9, weight: 8 };
-          layer.eachLayer ?
-            layer.eachLayer(sublayer => sublayer.setStyle(style)) :
-            layer.setStyle(style);
-          ruleType === 'partial' ? yellowLayers.push(layer) : redLayers.push(layer);
         }
+
+        return { ...f, properties: { ...p, state } };
       });
 
-      [...hiddenLayers, ...greenLayers, ...yellowLayers, ...redLayers].forEach(layer => {
-        layer.addTo(map);
-      });
+      map.getSource(SRC).setData({ type: 'FeatureCollection', features });
+
+      // Expressions для paint
+      const fillColor = ['match', ['get','state'],
+        'none',    '#94a3b8',
+        'partial', '#eab308',
+        'full',    '#ef4444',
+        'hidden',  'transparent',
+        '#94a3b8'
+      ];
+      const fillOpacity = ['match', ['get','state'],
+        'none',    0.06,
+        'partial', 0.12,
+        'full',    0.14,
+        'hidden',  0,
+        0.06
+      ];
+      const lineColor = ['match', ['get','state'],
+        'none',    '#94a3b8',
+        'partial', '#eab308',
+        'full',    '#ef4444',
+        'hidden',  'transparent',
+        '#94a3b8'
+      ];
+      const lineWidth = ['match', ['get','state'],
+        'none',    1,
+        'partial', 2.5,
+        'full',    2.5,
+        'hidden',  0,
+        1
+      ];
+      const lineOpacity = ['match', ['get','state'],
+        'none',    0.5,
+        'partial', 0.9,
+        'full',    0.9,
+        'hidden',  0,
+        0.5
+      ];
+
+      map.setPaintProperty(FILL, 'fill-color', fillColor);
+      map.setPaintProperty(FILL, 'fill-opacity', fillOpacity);
+      map.setPaintProperty(LINE, 'line-color', lineColor);
+      map.setPaintProperty(LINE, 'line-width', lineWidth);
+      map.setPaintProperty(LINE, 'line-opacity', lineOpacity);
     }
 
+    // =====================================================================
+    // 7. СПИСОК ОБЩИХ ПРАВИЛ
+    // =====================================================================
     function updateGeneralRules(date) {
-      const container = document.getElementById('restrictions-list');
-      container.innerHTML = '';
+      const box = document.getElementById('restrictions-list');
+      box.innerHTML = '';
 
-      const active = generalRules.filter(rule => isDateInRange(date, rule.start, rule.end));
-
+      const active = generalRules.filter(r => isDateInRange(date, r.start, r.end));
       if (active.length === 0) {
-        container.innerHTML = '<p style="color: #999; font-size: 13px; text-align: center; margin: 8px 0;">Нет действующих общих правил</p>';
-      } else {
-        active.forEach(rule => {
-          const item = document.createElement('div');
-          item.className = 'restriction-item';
-
-          const title = document.createElement('div');
-          title.className = 'restriction-title';
-          title.textContent = rule.name;
-          title.style.cursor = 'pointer';
-
-          const content = document.createElement('div');
-          content.className = 'restriction-content';
-          content.innerHTML = rule.rule;
-          content.style.display = 'none';
-
-          title.onclick = () => {
-            content.style.display = content.style.display === 'block' ? 'none' : 'block';
-          };
-
-          item.appendChild(title);
-          item.appendChild(content);
-          container.appendChild(item);
-        });
+        box.innerHTML = '<p style="color:#94a3b8;font-size:12px;text-align:center;margin:8px 0;">Нет действующих общих правил</p>';
+        return;
       }
+
+      active.forEach(rule => {
+        const item = document.createElement('div');
+        item.className = 'restriction-item';
+
+        const title = document.createElement('div');
+        title.className = 'restriction-title';
+        title.textContent = rule.name;
+
+        const content = document.createElement('div');
+        content.className = 'restriction-content';
+        content.textContent = rule.rule;
+        content.style.display = 'none';
+
+        title.onclick = () => {
+          content.style.display = content.style.display === 'block' ? 'none' : 'block';
+        };
+
+        item.appendChild(title);
+        item.appendChild(content);
+        box.appendChild(item);
+      });
     }
 
-    map.on('click', function(e) {
-      const lat = e.latlng.lat;
-      const lng = e.latlng.lng;
+    // =====================================================================
+    // 8. КАСТОМНЫЙ МАРКЕР
+    // =====================================================================
+    function createStatusMarkerEl(statusClass) {
+      const colors = { ok: '#22c55e', warning: '#eab308', error: '#ef4444' };
+      const icons  = { ok: '✓', warning: '!', error: '✕' };
+      const el = document.createElement('div');
+      el.className = 'custom-marker';
+      el.style.background = colors[statusClass] || '#38bdf8';
+      el.innerHTML = `<span>${icons[statusClass] || '?'}</span>`;
+      return el;
+    }
+
+    // =====================================================================
+    // 9. КЛИК ПО КАРТЕ
+    // =====================================================================
+    map.on('click', (e) => {
+      const { lat, lng } = e.lngLat;
       const dateStr = document.getElementById('fishing-date').value;
       const date = new Date(dateStr);
 
-      if (marker) map.removeLayer(marker);
-      marker = L.marker([lat, lng]).addTo(map);
-
       let locationName = null;
-      let fullRestrictions = [];
-      let partialRestrictions = [];
+      const fullRestrictions = [];
+      const partialRestrictions = [];
 
-      for (const layer of zoneLayers) {
-        const zone = layer.zoneData;
-        const isActivePeriod = isDateInRange(date, zone.start, zone.end);
-        let isInside = false;
+      // Локальные зоны
+      zonesGeoJson.features.forEach(f => {
+        const p = f.properties;
+        if (!isDateInRange(date, p.start, p.end)) return;
 
-        if (zone.type === 'polygon') {
-          isInside = L.GeometryUtil.pointInPolygon(e.latlng, layer.getLatLngs());
-        } else if (zone.type === 'line') {
-          isInside = isPointNearLine(lat, lng, zone.coords, 50);
-        } else if (zone.type === 'river') {
-          isInside = isNearAnyBranch(lat, lng, zone.branches, 50);
+        let inside = false;
+        if (f.geometry.type === 'Polygon') {
+          inside = pointInPolygon(lat, lng, f.geometry.coordinates);
+        } else if (f.geometry.type === 'LineString') {
+          inside = isPointNearLine(lat, lng, f.geometry.coordinates, 0.0005);
+        } else if (f.geometry.type === 'MultiLineString') {
+          inside = isNearAnyBranch(lat, lng, f.geometry.coordinates, 0.0005);
         }
+        if (!inside) return;
 
-        if (isInside && isActivePeriod) {
-          locationName = zone.name;
-          const rule = generalRules.find(r => r.name === zone.name);
-          const ruleType = zone.ruleType || rule?.type || 'full';
-          if (ruleType === 'partial') {
-            partialRestrictions.push(rule?.rule || zone.rule);
-          } else {
-            fullRestrictions.push(zone.rule);
-          }
+        locationName = p.name;
+        const rule = generalRules.find(r => r.name === p.name);
+        const rt = p.ruleType || rule?.type || 'full';
+        if (rt === 'partial') {
+          partialRestrictions.push(rule?.rule || p.rule);
+        } else {
+          fullRestrictions.push(p.rule);
         }
-      }
+      });
 
+      // Глобальные
       generalRules.forEach(rule => {
         if (rule.appliesEverywhere && isDateInRange(date, rule.start, rule.end)) {
-          if (rule.type === 'partial') {
-            partialRestrictions.push(rule.rule);
-          } else {
-            fullRestrictions.push(rule.rule);
-          }
+          if (rule.type === 'partial') partialRestrictions.push(rule.rule);
+          else fullRestrictions.push(rule.rule);
         }
       });
 
       let status, statusClass;
       if (fullRestrictions.length > 0) {
-        status = '❌ Рыбалка запрещена.';
-        statusClass = 'error';
+        status = '❌ Рыбалка запрещена'; statusClass = 'error';
       } else if (partialRestrictions.length > 0) {
-        status = '⚠️ Рыбалка разрешена, но с ограничениями.';
-        statusClass = 'warning';
+        status = '⚠️ Разрешена с ограничениями'; statusClass = 'warning';
       } else {
-        status = '✅ Рыбалка разрешена при соблюдении общих правил';
-        statusClass = 'ok';
+        status = '✅ Рыбалка разрешена'; statusClass = 'ok';
       }
 
       const reasons = [...fullRestrictions, ...partialRestrictions]
-        .map(r => `<div class="reason">${r}</div>`)
-        .join('');
+        .map(r => `<div class="reason">${r}</div>`).join('');
 
-      marker.bindPopup(`
-        <div class="popup-info">
-          <strong>Координаты:</strong> ${lat.toFixed(6)}, ${lng.toFixed(6)}<br>
-          ${locationName ? `<strong>Локация:</strong> ${locationName}<br>` : ''}
-          <strong>Дата:</strong> ${formatDate(dateStr)}<br>
-          <strong>Ограничения:</strong><br>
-          <span class="status ${statusClass}">${status}</span>
-          ${reasons}
-        </div>
-      `).openPopup();
+      if (marker) marker.remove();
+
+      const popupEl = document.createElement('div');
+      popupEl.className = 'popup-info';
+      popupEl.innerHTML = `
+        ${locationName ? `<strong>${locationName}</strong><div class="divider"></div>` : ''}
+        <div class="row"><span>Дата</span><b>${formatDate(dateStr)}</b></div>
+        <div class="row"><span>Координаты</span><b>${lat.toFixed(5)}, ${lng.toFixed(5)}</b></div>
+        <div class="status ${statusClass}">${status}</div>
+        ${reasons}
+      `;
+
+      const el = createStatusMarkerEl(statusClass);
+      marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([lng, lat])
+        .setPopup(new maplibregl.Popup({ offset: 24 }).setDOMContent(popupEl))
+        .addTo(map);
+
+      marker.togglePopup();
     });
 
-    document.getElementById('fishing-date').addEventListener('change', function() {
-      const date = new Date(this.value);
-      updateZoneColors(this.value);
-      updateGeneralRules(date);
+    // =====================================================================
+    // 10. СМЕНА ДАТЫ
+    // =====================================================================
+    document.getElementById('fishing-date').addEventListener('change', function () {
+      currentDate = new Date(this.value);
+      refreshZones();
+      updateGeneralRules(currentDate);
     });
 
+    // =====================================================================
+    // 11. СТАРТ
+    // =====================================================================
     loadZones();
   </script>
 
   <div class="legal-banner">
-    Согласно Приказу Министерства сельского хозяйства РФ от 9 января 2020 г. № 1<br>
-    "Об утверждении правил рыболовства для Азово-Черноморского рыбохозяйственного бассейна"<br>
-    (с изменениями и дополнениями от 28 июля 2025 г.)
+    Приказ Министерства сельского хозяйства РФ от 9 января 2020 г. № 1
+    «Об утверждении правил рыболовства для Азово-Черноморского рыбохозяйственного бассейна»
+    (с изм. и доп. от 28 июля 2025 г.)
   </div>
 </body>
 </html>
